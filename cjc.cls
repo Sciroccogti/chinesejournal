@@ -47,7 +47,15 @@
 \RequirePackage{caption}
 \RequirePackage{url}
 \RequirePackage[numbers,sort&compress]{natbib}
-\newcommand\cjc@strifeq{\csname str_if_eq_x:nnTF\endcsname}
+\newcommand\cjc@strifeq[4]{%
+  \edef\ustc@tmp@a{#1}%
+  \edef\ustc@tmp@b{#2}%
+  \ifx\ustc@tmp@a\ustc@tmp@b
+    #3%
+  \else
+    #4%
+  \fi
+}
 \newcommand\cjc@fontset{\csname g__ctex_fontset_tl\endcsname}
 \cjc@strifeq{\cjc@fontset}{fandol}{
   \setmainfont[
