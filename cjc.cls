@@ -203,8 +203,8 @@
 \newcommand\cjc@hf@font{\small}
 \fancypagestyle{main}{%
   \fancyhf{}%
-  \fancyhead[LO]{\cjc@hf@font ? 期}%
-  \fancyhead[CO]{\cjc@hf@font 作者名等：论文题目}%
+  % \fancyhead[LO]{\cjc@hf@font ? 期}%
+  % \fancyhead[CO]{\cjc@hf@font 作者名等：论文题目}%
   \fancyhead[RO,LE]{\cjc@hf@font\thepage}%
   % \fancyhead[CE]{\cjc@hf@font 计算机学报}%
   % \fancyhead[RE]{\cjc@hf@font \the\year{} 年}%
