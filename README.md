@@ -41,3 +41,10 @@ make doc        # 编译生成 cjc.pdf
 make            # 编译生成论文 main.pdf
 make clean      # 删除编译过程中生成的临时文件
 ```
+
+在 VScode 中请使用 LaTeX Workshop：
+1. 保存 `.tex`；
+2. 运行 `bibtex main.aux`
+3. 最后再回到 `.tex` 保存 **两次**
+
+即可生成正确的含参考文献的 `.pdf`。
