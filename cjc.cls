@@ -213,6 +213,7 @@
 \fancypagestyle{plain}{% 首页专用
   \fancyhf{}%
   \fancyhead[RO,LE]{\cjc@hf@font\thepage}%
+  \fancyhead[L]{\cjc@hf@font 原文：https://doi.org/10.1007/s11265-019-01447-8}
   % \fancyhead[L]{\cjc@hf@font 第 ?? 卷\quad 第 ? 期\\\the\year{} 年 \the\month{} 月}%
   % \fancyhead[C]{\cjc@hf@font 计算机学报\\CHINESE JOURNAL OF COMPUTERS}%
   % \fancyhead[R]{\cjc@hf@font Vol. ??  No. ?\\???.20??}%

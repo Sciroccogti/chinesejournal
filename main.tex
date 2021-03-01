@@ -7,45 +7,190 @@
 \usepackage{booktabs}
 \usepackage{siunitx}
 \usepackage{hyperref}
-
-
+\usepackage{nicematrix}
+\usepackage{algorithm}
+\usepackage{algorithmic}
 
 \begin{document}
 
-\title{题目（中英文题目一致）（全文除特别声明外，外文统一用
-Times New Roman）}
-\author{作者名 \and 作者名 \and 作者名}
+\title{基于x86多核处理器的高通量多元LDPC码FFT-SPA译码器的实现}
+\author{Bertrand Le Gal\footnote{IMS Lab., Univ. Bordeaux, Bordeaux INP, CNRS UMR 5218, France} \and Christophe Jego\footnotemark[1]}
 
 \maketitle
 
 \begin{abstract}
-  中文摘要内容置于此处(英文摘要中要有这些内容)，字体为小5号宋体。
-  摘要贡献部分，要有数据支持，不要出现“...大大提高”、“...显著改善”等描述，
-  正确的描述是“比…提高X\%”、 “在…上改善X\%”。
+  低密度奇偶校验（LDPC）码是一种众所周知的错误码，常被用于无线通信和卫星通信。
+  而通过将LDPC码扩展到高阶伽罗瓦域，能够进一步提高其纠错性能，从而产生了所谓的
+  多元LDPC码（NB-LDPC）。而纠错性能改进（CCSDS \citeyear{CCSDS_2014}）是国际空间数据系统咨询委员
+  会（CCSDS）在下一代上行链路实验规范（CCSDS \citeyear{CCSDS_2014}、\citeyear{CCSDS_2015}）
+  中采用NB-LDPC码的主要原因。NB-LDPC码对短帧具有较高的纠错效率，因此该码是物联网应用的理想选择。
+  然而，这种性能上的增益是以解码计算复杂度为代价的（CCSDS \citeyear{CCSDS_2014}; CondeCanencia etal. \citeyear{comparison_NBLDPC}）。
+  本文给出了一个x86多核NB-LDPC译码器的实现。与GPU（图形处理单元）设备上最高效的
+  工作相比，这一实现FFT-SPA算法的译码器的吞吐量提高了约1.3倍到2.7倍，延迟减少了
+  95\%以上，功耗降低了一半。实际上，在x86架构上进行高效的内存映射和计算优化的话，
+  可以实现比基于类似实验设置的GPU更高的解码吞吐量。因此，吞吐量效率、低功耗下的
+  低处理延迟使得本文所提出的多核方案对于用于CCSDS标准和未来物联网应用中的SDR、
+  Cloud-RAN系统中的NB-LDPC译码器的实时实现极具现实意义。\medskip\newline
+  \textbf{关键字 }多元LDPC码，FFT-SPA，多核，SIMD，纠错码
+
 \end{abstract}
 
+\section{简介}
 
+  纠错码（ECC）是现代数字通信系统中广泛用于提高系统可靠性的纠错技术。而低密度奇偶
+  校验码\cite{gallager_low_1962}由于其接近信道容量的性能，成为了最流行的纠错码之一。
+  许多卫星通信标准，如 DVB-S2X \cite{noauthor_dvb_nodate} 或 CCSDS \cite{CCSDS_2011}，
+  都采用了这种码族。文\cite{davey_low_1998,noauthor_barnault_nodate}提出了将二进制LDPC码扩展到多进制伽罗瓦域
+  的方法，以提高纠错性能。这类方法很可能在未来的CCSDS标准中被采用\cite{CCSDS_2015,dolecek_non-binary_2014}。
+  事实上，在CCSDS环境中，应用该方法后的纠错增益从1.0 dB提升到了1.3 dB\cite{CCSDS_2015}。
+  因此，大量的研究集中在这一新的具有挑战性的代码系列上，例如高效的软件解码器实现\cite{noauthor_wang_nodate,noauthor_andrade_nodate,noauthor_beermann_nodate,andrade_optimized_2014,noauthor_thi_nodate,beermann_gpu_2015,noauthor_pham_nodate,liu_high-throughput_2018}
+  或高效的硬件架构设计\cite{boutillon_design_2013,abassi_novel_2017}。
+  然而，诸如灵活性、高吞吐量和低延迟等一系列面向未来基于SDR的系统的特性还有待进一步研究。
 
-\section{一级标题}
+  ECC 技术通常用计算复杂度来区分。在过去的十年中，ASIC 或 FPGA是首选的实现方法，
+  甚至对于地面基带站也是如此。实际上，基于 ASIC 的方案提供了最佳的面积、功耗和吞吐量特性。
+  但是，它们的运行时灵活性低，开发周期长。为了解决这一问题，研究了基于FPGA的体系结构设计。
+  而这些目标具有计算并行性强和低功耗的优点。然而，基于FPGA的硬件实现也具有有限的灵活性，
+  并且设计周期也过长。另一方面，ASIC 和 FPGA 的实现都是基于近似的译码算法，
+  这使得架构成本最小化的同时给纠错能力带来了负面影响。
 
-对投稿的基本要求：
+  大规模并行可编程器件在获得很大进步和发展后，已被用于许多纠错码的译码器实现中，
+  例如二进制LDPC码\cite{chang_accelerating_2011,falcao_portable_2012,noauthor_wang_nodate-1,li_efficient_2013,lin_high_2014,gal_high-throughput_2016,andrade_survey_2016}
+  、NB-LDPC码\cite{noauthor_wang_nodate,noauthor_andrade_nodate,noauthor_beermann_nodate,andrade_optimized_2014,noauthor_thi_nodate,beermann_gpu_2015,noauthor_pham_nodate,liu_high-throughput_2018}
+  和极性码\cite{noauthor_gal_nodate,gal_multi-gbs_2015,giard_low-latency_2018}。
+  这些软件译码器的设计可达到Mbps或Gbps的吞吐量，也能够提供软件无线电（SDR）\cite{grayver_implementing_2013}
+  系统所需的灵活性。
 
-（1）研究性论文主体应包括引言（重点论述研究的科学问题、意义、解决思路、价值、
-贡献等）、相关工作（为与引言部分独立的一个章节）、主要成果论述、关键实现技术、
-验证（对比实验或理论证明）、结论（结束语）等内容；系统实现或实验应有关键点的详细论述，以便读者能够重复实现论文所述成果。实验应有具体的实验环境设置、全面细致的数据对比分析。
+  许多最近的研究工作专注于NB-LDPC译码器在GPU设备上的软件实现\cite{noauthor_wang_nodate,noauthor_andrade_nodate,noauthor_beermann_nodate,andrade_optimized_2014,noauthor_thi_nodate,beermann_gpu_2015,noauthor_pham_nodate,liu_high-throughput_2018}。
+  虽然二进制LDPC译码器在GPU和多核目标上的高效实现已经比较理想\cite{chang_accelerating_2011,falcao_portable_2012,noauthor_wang_nodate-1,li_efficient_2013,lin_high_2014,gal_high-throughput_2016,andrade_survey_2016}，
+  但是NBLDPC码却相去甚远。实际上，NB-LDPC译码算法与二进制LDPC译码算法有很大的不同。
+  这意味着以前的优化策略不能直接移植。因此，针对GPU目标，研究人员提出了另外的并行化策略。
+  由于解码算法的主要差异，还必须在多核体系结构上重新设计它们。第一批研究\cite{noauthor_andrade_nodate,noauthor_beermann_nodate,andrade_optimized_2014,beermann_gpu_2015,liu_high-throughput_2018}
+  集中于在GPU目标上实现具有高纠错性能的NB-LDPC解码算法，用于只关注纠错性能的应用。
+  使用5次分层译码迭代后，GPU上的吞吐率从1Mbps提高到了228Mbps。然而，处理延迟显著增加：
+  当选择最有效的吞吐量设置时，延迟在21 ms到123 ms不等\cite{liu_high-throughput_2018}。
+  第二批研究\cite{noauthor_wang_nodate,noauthor_thi_nodate,noauthor_pham_nodate}
+  集中于在GPU设备上实现解码启发式算法。然而，即便有较低的计算复杂度，与基于初始公式的解码吞吐量相比，
+  所实现的解码吞吐量仍不可观\cite{noauthor_andrade_nodate,liu_high-throughput_2018}。
+  大多数基于GPU的解码器在吞吐量或延迟方面的低性能水平是由GPU的体系结构导致的，
+  例如缓慢的全局内存、有限的共享内存等，及其相关的编程模型，这些限制造成映射NB-LDPC
+  解码算法极具挑战性。
 
-（2）综述应包括引言、问题与挑战、研究现状分析、未来研究方向、结论等内容。以分析、对比为主，避免堆砌文献或一般性介绍、叙述。
+  本文详细介绍了另一种基于x86多核结构的NB-LDPC译码器的软件实现。本文选择FFT-SPA算法是因为它比最小和或SPA译码算法具有更低的计算复杂度和更高的纠错性能
+  \footnote{尽管优化过的SPA和最小和译码器不是本文重点，但仍对其进行了实现和测试。在“实验”一章中有一栏对这些算法进行了性能比较。}。
+  x86处理器的编程模型和结构特点与GPU不同。尽管与GPU设备相比，该算法的处理单元较少，
+  但它似乎更好地利用了x86多核特性，就像其他ECC码族一样\cite{gal_high-throughput_2016,noauthor_wang_nodate-1,noauthor_cassagne_nodate}。
+  此外，该解码器的吞吐量比大多数相关成果都要高\cite{noauthor_andrade_nodate,noauthor_beermann_nodate,andrade_optimized_2014,beermann_gpu_2015,liu_high-throughput_2018}。
+  特别是在服务器级x86 CPU上，总能得到更好的吞吐量、延迟和功耗特性。
+  为了达到这个性能水平，本文采用了不同的并行化策略和算法优化。实验结果表明，
+  所提出的NB-LDPC软件译码器实现方案在吞吐量、延迟和能量消耗方面比基于GPU的实现更具竞争力。
+  功耗的降低和低延迟的特性使得该实现更适合于SDR系统。与第一个借助OpenCL语言\cite{noauthor_wang_nodate}
+  实现的x86软件解码器实现相比，本文提出的软件解码器实现直接利用了SIMD和多核特性，
+  使其比\cite{noauthor_wang_nodate}中给出的x86实现快1000倍以上。
 
-（3）定理证明、公式推导、大篇幅的数学论述、原始数据，放到论文最后的附录中。
+  论文的其余部分组织如下。第 \ref{sec:decoding} 节介绍了NB-LDPC码、FFT-SPA译码算法
+  以及在GPU上实现NB-LDPC译码器的相关工作。然后，第 \ref{sec:fftspa} 节详细介绍了
+  目标x86多核平台以及我们的并行化和优化方法。最后，在第 \ref{sec:experiment} 节中
+  提供了性能分析和与相关工作的横向对比。
 
-稿件提交时的基本要求：
+\section{NB-LDPC 码的译码}\label{sec:decoding}
+\subsection{简介}
 
-（1）本模板中要求的各项内容正确齐全，无遗漏；
+  $(N,K)$ NB-LDPC 码是一种由稀疏奇偶校验矩阵 $H$ 定义的线性分组码，其中非零元素属于
+  $q\geq2$ \eqref{eq:1} 的伽罗瓦域$\mathbb{GF}(q)$。$H$矩阵的维数为$M{\times}N$，
+  其中$M=N−K$是奇偶方程（或校验节点，CN）的数目，N是可变节点（VN）的数目，即码字中
+  $\mathbb{GF}(q)$符号的数目。当$H$矩阵中的值$\alpha_{ij}$不为0时，
+  $c_j$奇偶方程中就会带有元素$v_i$。第$j$行中非零元素的个数定义为用$d_{c_j}$表示的 CN 度。
+  类似地，定义了第$i$列中非零元素的数量作为用$d_{v_i}$表示的 VN 度。
 
-（2）语句通顺，无中文、英文语法错误，易于阅读理解，符号使用正确，图、表清晰无误；
+\begin{equation}\label{eq:1}
+  \setlength{\arraycolsep}{3pt}
+  H=
+  \begin{pNiceMatrix}[first-row,first-col]
+        & v_{0} & v_{1} & v_{2} & v_{3} & v_{4} & v_{5} & v_{6} & v_{7}\\
+    c_0 & \alpha_{00} & \alpha_{10} & \alpha_{20} & 0 & 0 & 0 & 0 & 0 \\
+    c_1 & 0 & 0 & 0 & \alpha_{31} & \alpha_{41} & \alpha_{51} & 0 & 0 \\
+    c_2 & \alpha_{02} & 0 & 0 & \alpha_{32} & 0 & 0 & \alpha_{62} & 0 \\
+    c_3 & 0 & \alpha_{13} & 0 & 0 & \alpha_{43} & 0 & 0 & \alpha_{73} \\
+  \end{pNiceMatrix}
+\end{equation}
 
-（3）在学术、技术上，论文内容正确无误，各项内容确定。
+  定义NB-LDPC码的$H$矩阵也可以用Tanner图表示，如图 \ref{fig:1} 所示。
 
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=\linewidth]{assets/fig1.png}
+  \caption{Eq.\ref{eq:1}中 $H$ 矩阵的Tanner图}\label{fig:1}
+\end{figure}
+
+  码字由$x=\{x_0,x_1,\dots,x_{N-1}\}$表示，其中$x_i,i\in[0,N-1]$ 是由 $m=\log_2(q)$
+  位表示的$\mathbb{GF}(q)$符号。为了描述等于$\mathbb{GF}$的$q$元素之一的符号$x$的概率$q$，
+  使用 q 维 LR 向量。$x_i$的第 $a$ 个符号元素的概率由 $p_i(a),a\in[0,q-1]$ 表示。
+
+  集合$\Psi(c_j)$表示奇偶校验方程$c_j$中包含的$x$个$d_{c_j}$符号。同样，集合$\Psi(x_i)$
+  包含了含有符号$x_i$的$d_{v_i}$校验方程。排除由符号$/$表示，例如，$\Psi(x_i)/c_j$表示
+  除$c_j$外的$\Psi(x_i)$检验方程组。
+
+  与二进制 LDPC 译码类似，NB-LDPC 译码基于消息传递算法执行。最佳纠错性能是通过执行
+  Sum-Product算法\cite{carrasco_non-binary_2008}（SPA）或其等效公式（如FFT-SPA\cite{carrasco_non-binary_2008}）获得的。
+  FFT-SPA 解码算法的优点之一，是由于去除消息卷积而使得处理 CN 的计算复杂度降低。
+  这种改进是在不影响解码性能的情况下获得的，因为它们在数学上是等价的\cite{comparison_NBLDPC}。
+  此外，如在\cite{noauthor_andrade_nodate}中强调并在\cite{carrasco_non-binary_2008}中演示的，
+  大多数$\mathbb{GF}(q)$域的解码操作都被转移到了$\mathbb{R}$，以便于实现。
+
+  算法1提供了用于水平分层解码调度的形式化FFT-SPA解码算法\cite{beermann_gpu_2015,liu_high-throughput_2018,noauthor_hocevar_nodate}。
+  与基于泛洪的调度相比，它有助于：（i）在提供类似的纠错性能的同时加倍收敛速度；
+  （ii）减少解码器的内存占用。这些特性使得这种计算调度在软件\cite{noauthor_thi_nodate,beermann_gpu_2015,noauthor_pham_nodate,liu_high-throughput_2018}
+  和硬件\cite{boutillon_design_2013,abassi_novel_2017}实现中都很流行。
+
+\begin{algorithm}[htb]
+  \begin{algorithmic}[1]
+    \STATE \textbf{Step 1}: 初始化
+    \STATE $p_i(x)=p(v_i=x|y_i)$
+    \STATE $m^0_{ji}(x)=1$
+    \STATE $\vartriangleright$ 进行 $iter_max$ 次解码迭代
+    \FORALL{$t=1\rightarrow(iter\_max)$}
+      \STATE \textbf{Step 2}: 轮询 NB-LDPC 码中的所有 CN
+      \FORALL{$j{\in}C$}
+        \STATE$\vartriangleright$ 计算接收到的消息 $m_{ij}$
+        \FORALL{$i\in\Psi(j)$}
+          \STATE $m_{i j}^{t}(x)=\left(\sum_{x \in \mathbb{G} \mathbb{F}} m_{j i}^{t-1}(x)\right) \times\left(\frac{p_{i}(x)}{m_{j i}^{t-1}(x)}\right)$
+          \STATE $M^t_{ij}=\Theta_{\alpha{ij}}(m^t_{ij})$
+          \STATE $\tilde{M^t_{ij}}=FFT(M^t_{ij})$
+        \ENDFOR
+        \STATE$\vartriangleright$傅里叶域中累乘概率
+        \FORALL{$i\in\Psi(j)$}
+          \STATE $\tilde{M}_{j i}^{t}=\prod_{i^{\prime} \in \Psi(j) / i} \tilde{M}_{i^{\prime} j}^{t}$
+        \ENDFOR
+        \STATE$\vartriangleright$计算输出的消息 $m_{ij}$
+        \FORALL{$i\in\Psi(j)$}
+          \STATE $M^t_{ji}=FFT^{-1}(\tilde{M^t_{ji}})$
+          \STATE $m^t_{ji}=\Theta^{-1}_{\alpha{ij}}(M^t_{ji})$
+        \ENDFOR
+        \STATE$\vartriangleright$更新符号概率
+        \FORALL{$i\in\Psi(j)$}
+          \STATE $p_i(x)=p_i(x)\times(\frac{m^t_{ji}(x)}{m^{t-1}_{ji}(x)})$
+        \ENDFOR
+      \ENDFOR
+    \ENDFOR
+    \STATE\textbf{Step 3}: 符号硬判
+    \FORALL{$i\in{V}$}
+      \STATE $\hat{v}_{i}=\arg \max \left(p_{i}(x)\right)$
+    \ENDFOR
+  \end{algorithmic}
+  \caption{ 水平 TDMP FFT-SPA 算法}
+  \label{alg:1}
+\end{algorithm}
+
+  该算法可以概括为三个主要步骤。首先，使用 $y_i$ 信道信息计算 $N$ 个接收符号 $p_i$ 的概率
+  （算法1：行2）。对于每个符号 $p_i$，估计每个元素$x\in\mathbb{GF}(q)$的概率。
+  其次，对 $H$ 矩阵中的所有 CN 依次求值（算法1：行7:27）。对于 CN 计算，首先动态
+  计算从 VN 到 CN 的 $m_{ij}$ 消息。然后，生成 $m_{ji}$ 消息并更新每个符号
+  $p_i(x)$ 的概率。最后，对于每个 $p_i(x)$，选择具有最高概率$p_i(x)$ 的符号
+  $\tilde{v}_v$（算法1：行30:32）。
+
+\section{FFT-SPA 算法实现}\label{sec:fftspa}
+\section{实验结果}\label{sec:experiment}
 \subsection{二级标题}
 
 \subsubsection{三级标题}
@@ -120,9 +265,9 @@ Times New Roman）}
     \toprule
     示例表格 & 第一行为表头，表头要有内容 \\
     \midrule
-    & \\
+             &                            \\
     \midrule
-    & \\
+             &                            \\
     \bottomrule
   \end{tabular}
 \end{table}
