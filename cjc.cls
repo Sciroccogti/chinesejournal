@@ -47,6 +47,14 @@
 \RequirePackage{caption}
 \RequirePackage{url}
 \RequirePackage[numbers,sort&compress]{natbib}
+
+\newcommand{\blue}[1]{{\color{blue}{#1}}}
+\newcommand{\red}[1]{{\color{red}{#1}}}
+\let\oldcite\cite
+\renewcommand{\cite}[1]{\blue{\oldcite{#1}}}
+\let\oldciteyear\citeyear
+\renewcommand{\citeyear}[1]{\blue{\oldciteyear{#1}}}
+
 \newcommand\cjc@strifeq[4]{%
   \edef\ustc@tmp@a{#1}%
   \edef\ustc@tmp@b{#2}%
