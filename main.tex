@@ -155,7 +155,7 @@
         \STATE$\vartriangleright$ 计算接收到的消息 $m_{ij}$
         \FORALL{$i\in\Psi(j)$}
           \STATE $m_{i j}^{t}(x)=\left(\sum_{x \in \mathbb{G} \mathbb{F}} m_{j i}^{t-1}(x)\right) \times\left(\frac{p_{i}(x)}{m_{j i}^{t-1}(x)}\right)$
-          \STATE $M^t_{ij}=\Theta_{\alpha{ij}}(m^t_{ij})$
+          \STATE $M^t_{ij}=\Theta_{\alpha_{ij}}(m^t_{ij})$
           \STATE $\tilde{M^t_{ij}}=FFT(M^t_{ij})$
         \ENDFOR
         \STATE$\vartriangleright$傅里叶域中累乘概率
@@ -189,7 +189,139 @@
   $p_i(x)$ 的概率。最后，对于每个 $p_i(x)$，选择具有最高概率$p_i(x)$ 的符号
   $\tilde{v}_v$（算法1：行30:32）。
 
+  重复包括顺序处理 CN 的第二步，直到达到最大迭代次数或获得有效码字为止。CN 处理可扩展为7个基本阶段：
+\begin{enumerate}
+  \item 从 VN 到 CN 的消息 $m^t_{ij}(x)$ 是根据当前 VN 值（$p_i(x)$）和从上一次
+  迭代中从 CN 到 VN 的消息（$m^{t-1}_{ji}(x)$）进行动态计算。
+  \item 消息 $m_{ij}$ 在 $\mathbb{GF}$ 域中与来自 $H$ 矩阵的 $\alpha_{ij}$ 值相乘。
+  此操作等效于受 $\alpha_{ij}$ 约束的数据置换，表示为 $\Theta_{\alpha_{ij}}$。
+  \item 然后使用 $FFT$ 变换操作，$M_{ij}$ 消息值被转换到傅里叶域。
+  \item 在$\tilde{M}_{ij}$消息值之间的进行一组标量乘法产生 CN 到 VN 消息。
+  \item 通过 $FFT^{-1}$ 变换操作，消息值被转回概率域。 
+  \item 消息 $M_{ji}$ 在 $\mathbb{GF}$ 域中除以第 2 阶段中使用的 $\alpha_{ij}$ 值。
+  \item 最后，根据计算出的 $m^t_{ji}(x)$ 值来更新符号概率 $p_i(x)$。
+\end{enumerate}
+
+  在解码过程中，解码器只需要存储 $N$ 个 $p_i$ 元素和 $M\times{d_{c_j}}$ 个 $m_{ji}$ 元素。
+  实际上，在第 $t−1$ 次迭代中用于存储的元素 $m^{t-1}_{ji}$ 的内存可以被重用于
+  在第 $t$ 次迭代中存储元素 $m^t_{ji}$。注意，元素 $p_i$ 和 $m_{ji}$ 本质上由 $q$ 元素构成。
+
+\subsection{相关工作}
+  
+  为了提供实现灵活性和高吞吐量性能，最近的许多研究都集中在将 NB-LDPC 解码器映射到 GPU 设备上\cite{noauthor_wang_nodate,noauthor_andrade_nodate,noauthor_beermann_nodate,andrade_optimized_2014,noauthor_thi_nodate,beermann_gpu_2015,noauthor_pham_nodate,liu_high-throughput_2018}。
+  这些研究的目的是利用 GPU 设备提供的大量计算并行度来达到高吞吐量，就像之前对二进制
+  LDPC 解码所做的那样\cite{li_efficient_2013,lin_high_2014,gal_high-throughput_2016}。
+  实际上，为了使软件方案适用于数字通信系统仿真或 SDR 目的，必须解决灵活性、吞吐量、延迟和功耗效率等问题。
+
+  第一批工作\cite{noauthor_andrade_nodate,noauthor_beermann_nodate,andrade_optimized_2014,beermann_gpu_2015,liu_high-throughput_2018}
+  专注于基于 SPA 的算法，以提供高纠错性能。为了降低解码过程的计算复杂度，FFT-SPA \cite{noauthor_andrade_nodate}
+  解码算法是首选。实际上，在 CN 处理中引入的 FFT 运算将 SPA 算法的卷积运算转化为一组标量项的乘积。
+  CN 处理的计算复杂度原来是$O(M\times3\times(d_c−2)\times2^{2{\times}m})$，现在降低
+  到$O(M\times{d_c}\times{m}\times2^{m})$\cite{declercq_decoding_2007}。
+  文献\cite{noauthor_andrade_nodate}中报告的第一个基于 GPU 的实现在执行 10 次泛洪迭代时，
+  $\mathbb{GF}(256)$ NB-LDPC 码的吞吐量在 0.5 到 1.6 Mbps 之间。由于 FFT 处理中计算并行性的降低，
+  所以 $q$ 值较低时吞吐量也较低。这实际上限制了 GPU 核心的使用率，从而进一步
+  限制了解码器的全局效率。\cite{noauthor_beermann_nodate}中也报告了类似的结论。
+  注意，这项工作的第一个目标是支持不规则的 NB-LDPC 码。在\cite{beermann_gpu_2015}中，
+  详细介绍了基于 FFT-SPA 算法分层公式的 NB-LDPC 解码器的实现。与\cite{noauthor_beermann_nodate}
+  中提到的方法相比，它增加了解码吞吐量，从而实现了等效的纠错性能。
+  然而，对于 $\mathbb{GF}(16)$ 到 $\mathbb{GF}(256)$ NB-LDPC 码，所测量的解码
+  吞吐量仍然低于 0.5 Mbps。最近，在\cite{liu_high-throughput_2018}中提出了一种高效的
+  基于 GPU 的解码器实现。在考虑 GPU 特性的基础上，找到了 FFT-SPA 译码算法的有效映射。
+  基于分层的调度与高端 GPU 设备的组合使得能够针对 $\mathbb{GF}(16)$ NB-LDPC 码获得
+  228 Mbps 的峰值吞吐量和 123 ms 的处理延迟。
+
+  第二批工作\cite{noauthor_wang_nodate,noauthor_thi_nodate,noauthor_pham_nodate}
+  集中于 SPA 解码算法的简化版本。不过，SPA 和 FFT-SPA 解码算法由于其高计算复杂度
+  而不满足硬件结构设计约束。此后，为了便于 NB-LDPC 译码器的硬件实现，提出了一些
+  低复杂度的译码算法：MinSum\cite{declercq_decoding_2007}、Min-Max\cite{declercq_decoding_2007}
+  和 Extended Min-Sum\cite{noauthor_voicila_nodate}。在这些译码算法中，$\mathbb{R}$中
+  的乘法和除法运算被转换成加法、减法和最小/最大运算。一些基于 GPU 的实现\cite{noauthor_wang_nodate,noauthor_thi_nodate,noauthor_pham_nodate}
+  侧重于 min-max 解码技术。事实上，低计算复杂度似乎更好地映射到GPU设备上。需要注意的是，
+  与基于 SPA 的算法相比，min-max 算法对纠错性能也有负面影响。然而，即使具有较低的计算复杂度，
+  对于 $\mathbb{GF}(32)$ NB-LDPC 码，GPU 实现也未能达到高于 0.7 Mbps 的吞吐量。
+  这种效率问题来自于 CN 计算中涉及的卷积式处理。
+
+  总的来说，在 GPU 实现的相关工作表明，NB-LDPC 译码过程具有较高的计算并行度。
+  因此，，它可以借助多核实现加速。然而，与 GPU 设备相关联的架构约束和编程模型似乎
+  限制了 NB-LDPC 解码器在解码吞吐量和延迟方面的实现效率。因此，在本文中，我们重点
+  讨论了这样一个多核体系结构，它提供了不同的编程模型和其他体系结构约束。实验结果表明，
+  NB-LDPC 译码算法的计算并行度非常适合 x86 处理器。
+
 \section{FFT-SPA 算法实现}\label{sec:fftspa}
+\subsection{选定的多核架构}
+
+  多核设备（例如 x86 或 ARM 处理器）提供足够当前的处理资源，以达到 Mbps 或 Gbps 吞吐量性能。
+  如二进制 LDPC 码\cite{gal_high-throughput_2016,gal_high-throughput_2015}解码所示，
+  它们应该适用于大多数 SDR 系统。所有的现代处理器都提供单指令多数据（SIMD）功能，
+  使得在不同的数据集上同时执行 $Q$ 个相同的计算。例如，在当前的 x86 处理器中，
+  使用 AVX2 配置，可以用一条指令处理 $Q=8$ 浮点计算。注意，根据功能单元的使用情况，
+  时钟周期可以触发多条指令。目前，x86 处理器内核最多可以并发执行 6 条指令。这种
+  并行化方法主要适用于不需要条件语句或分支语句的情况下，大量数据需要相同处理的计算序列。
+  此外，还可以使用多指令多数据（MIMD）功能。它为不同的计算序列或程序在不同的数据集
+  上并行执行提供了机会。因此，它使得并行帧处理成为可能。下一节将详细介绍
+  利用 SIMD 和 MIMD 特性提出的 FFT-SPA 实现和优化选择\footnote{实现NB-LDPC 译码器的源代码将会在 GitHub 上开源}。
+
+\subsection{并行化策略}
+
+三种主要的SIMD并行化策略可以加速基于MP的算法：
+\begin{itemize}
+  \item $S_1$ 策略包括并行解码多个帧，如\cite{gal_high-throughput_2016,gronroos_efficient_2012}
+  中的二进制LDPC解码器。它提供了处理和内存访问规则，从而提高了吞吐量性能。尽管如此，
+  它依然引入了处理延迟（至少是$Q$倍）和巨大的内存占用。
+  \item $S_2$ 策略包括跨 CN 内核的并行计算，例如并行处理 $Q$ 个 CN 内核。该策略缺乏内存访问规则性，
+  需要对 CN 内核进行特殊的调度。其实，并行执行的 CN 可以访问不同的 VN 元素。
+  \item $S_3$ 策略包括对单个CN内核的并行计算。对于二进制LDPC解码器的软件实现，
+  由于CN元素的计算复杂度较低，$S_3$策略被丢弃\cite{gal_high-throughput_2016}。
+  不过，对于NB-LDPC译码算法，由于$\mathbb{GF}(q),q\geq{Q}$，CN核的计算复杂度很高，
+  并且内存访问是规则的。因此，它使$S_3$策略更为合适。
+\end{itemize}
+
+  为了获得最佳的灵活性、吞吐量和延迟平衡，本文放弃了$S_1$和$S_2$并行化策略。
+  由于对于所有的NB-LDPC码，不可能实现避免VN访问冲突的CN重排步骤。所以只研究了$S_3$策略。
+
+\begin{table}[htb]
+  \caption{\\根据$d_c$归一化后的 CN 处理时间复杂度估计及并行可能性}
+  \label{tab:1}
+  \setlength\tabcolsep{3pt}% 调整列间距
+  \begin{tabular}{cccccc}
+    \toprule
+    算法1 & 处理任务 & 加/减 & 乘 & 除 & ECN \\
+    \midrule
+    L.10  & 消息处理 & - & - & \blue{$q$} & - \\
+    L.10  & 消息归一化 & \red{$q-1$} & - & \blue{$q$} & - \\
+    L.11  & $\mathbb{GF}$中的累乘 & - & - & - & - \\
+    L.12  & $FFT$ 处理 & \red{$q.\log_2(q)$} & - & - & - \\
+    L.20  & $FFT^{-1}$ 处理 & \red{$q.\log_2(q)$} & - & - & - \\
+    L.21  & $\mathbb{GF}$中的除法 & - & - & - & - \\
+    L.25  & 更新 VN 值 & - & \blue{$q$} & \blue{$q$} & - \\
+    L.16  & 频域中的 CN & - & - & - & \red{$3.(d_c-2)$} \\
+    -     & ECN & - & \blue{$q$} & - & - \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[htb]
+  \caption{\\根据$d_c$归一化后的 CN 处理空间复杂度估计及并行可能性}
+  \label{tab:2}
+  \setlength\tabcolsep{4.5pt}% 调整列间距
+  \begin{tabular}{ccccc}
+    \toprule
+    算法1 & 处理任务 & 加载 & 保存 & 存储的数据 \\
+    \midrule
+    L.10  & 消息处理 & \blue{$2.q$} & \blue{$q$} & $q$ \\
+    L.10  & 消息归一化 & \blue{$q$} & \blue{$q$} & $2.q$ \\
+    L.11  & $\mathbb{GF}$中的累乘 & \red{$q$} & \blue{$q$} & $q$ \\
+    L.12  & $FFT$ 处理 & \blue{$q$} & \blue{$q$} & $q.\log_2(q)$ \\
+    L.20  & $FFT^{-1}$ 处理 & \blue{$q$} & \blue{$q$} & $q.\log_2(q)$ \\
+    L.21  & $\mathbb{GF}$中的除法 & \red{$q$} & \blue{$q$} & $q$ \\
+    L.25  & 更新 VN 值 & \blue{$3\times{q}$} & \blue{$q$} & $q$ \\
+    L.16  & 频域中的 CN & - & - & $3q.(d_c-2)$ \\
+    -     & ECN & \blue{$2.q$} & \blue{$q$} & $q$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
 \section{实验结果}\label{sec:experiment}
 \subsection{二级标题}
 
