@@ -10,6 +10,8 @@
 \usepackage{nicematrix}
 \usepackage{algorithm}
 \usepackage{algorithmic}
+\usepackage{subfigure}
+\usepackage{stfloats}
 
 \begin{document}
 
@@ -218,7 +220,7 @@
   解码算法是首选。实际上，在 CN 处理中引入的 FFT 运算将 SPA 算法的卷积运算转化为一组标量项的乘积。
   CN 处理的计算复杂度原来是$O(M\times3\times(d_c−2)\times2^{2{\times}m})$，现在降低
   到$O(M\times{d_c}\times{m}\times2^{m})$\cite{declercq_decoding_2007}。
-  文献\cite{noauthor_andrade_nodate}中报告的第一个基于 GPU 的实现在执行 10 次泛洪迭代时，
+  \cite{noauthor_andrade_nodate}中报告的第一个基于 GPU 的实现在执行 10 次泛洪迭代时，
   $\mathbb{GF}(256)$ NB-LDPC 码的吞吐量在 0.5 到 1.6 Mbps 之间。由于 FFT 处理中计算并行性的降低，
   所以 $q$ 值较低时吞吐量也较低。这实际上限制了 GPU 核心的使用率，从而进一步
   限制了解码器的全局效率。\cite{noauthor_beermann_nodate}中也报告了类似的结论。
@@ -376,9 +378,179 @@
   相当于从存储器中读写$2^m$对齐的值。故二进制LDPC解码器实现中涉及的聚集和分散的
   存储器访问惩罚不再存在。
 
+\subsubsection{消息\texorpdfstring{$m_{ij}$}{mij}的生成与\texorpdfstring{$p_i$}{pi}的更新}
+
+  在解码过程中，需要连续处理 CN 以避免算法级的 VN 访问冲突管理。在开始 CN 处理时，
+  要先计算从 VN 到 CN（$m_{ij}$）的消息（算法1：行10）。计算包括将 $p_i(x)$ 除以
+  先前的 $m_{ji}(x)$ 值，然后归一化为$q$个$m_{ij}$元素之和。矢量元素$m_{ji}(x)$和
+  $p_i(x)$在$\mathbb{GF}$域中排序，以便于内存的存取和划分。而借助SIMD功能，
+  它们可以直接执行。$m_{ij}(x)$的和是动态计算的。最后进行水平求和，就能得到归一化因子。
+  由于SIMD除法指令比乘法指令慢得多，所以会对归一化因子取倒数。这样就能用乘法运算更新
+  所有$m_{ij}(x)$的值。
+
+  在该过程结束时，必须根据计算出的$m_{ji}(x)$值更新$p_i(x)$值（算法1：行25）。
+  由于元素的$\mathbb{GF}$阶数相同，剩余的乘法运算可以有效地用SIMD实现。此外，
+  在处理器寄存器中更新$p_i(x)$值的同时，定位并选择最佳候选符号$\tilde{v}_i$，
+  以加速当前解码迭代结束时停止准则的计算。
+
+  当$q\geq8$时，这两个处理阶段十分受益于SIMD特性，因为它们的内存访问总是对齐的，
+  而且计算中会规律性地填充SIMD管道以减少计算延迟。
+
+\subsubsection{\texorpdfstring{$\mathbb{GF}$}{GF}域中的乘除法}
+
+  在生成$m_{ij}$消息后且在涉及 CN 计算的$p_i$更新之前，必须根据$H$矩阵的$\alpha_{ij}$
+  值来变换$m_{ij}$和$M_{ji}$消息向量的元素（算法1：行11和21）。$\mathbb{GF}$中涉及计算和
+  未对齐内存访问的这些操作可以转换为离线预计算数据重新排序操作。这些操作在运行时不使用符号位置计算。
+  但数据重新排序仍然涉及$2^m$个未对齐的内存访问。
+
+  得益于x86 SIMD指令集，这些未对齐的内存访问可以以矢量化的方式实现。
+  注意，它会产生一定的延迟开销。幸而SIMD gather指令能帮助我们从内存基址和一组32比特地址偏移量
+  中读取32比特浮点数。$\mathbb{GF}(8)$和$\mathbb{GF}(16)$乘法函数的源代码如图 \ref{fig:2} 所示。
+  首先，对于$\mathbb{GF}(8)$中的乘法，根据$\alpha_{ij}$值（图\ref{fig:2}，行2）
+  计算存储了用于数据重新排序的$q$个预计算右值的存储器地址。为追求效率，这$q$个$\alpha$值
+  的$q$个内存偏移量被存储在了$q\times{q}$个元素的内存数组中，其中每个元素为32比特。
+  首先我们存储与$\alpha_0$相乘所需的$q$个内存偏移量。然后，连续存储$q$个$\alpha_1$内存的偏移量，
+  以此类推。这样，要加载右值的内存偏移量以同$\alpha$相乘，可以像$addr_{\alpha}=base\_addr+q\times\alpha$
+  这样计算内存偏移基址。一旦计算出内存偏移地址，内存偏移就被加载到SIMD寄存器中
+  （图\ref{fig:2}，行3）。然后，使用SIMD gather指令执行实现$\mathbb{GF}(8)$乘法的
+  伪随机存储器访问（图\ref{fig:2}，行4）。此指令结束时，R1寄存器中存储的消息值就被正确排序了。
+  最后，消息向量（$M_{ij}$）被存储回内存中（图\ref{fig:2}，行5）。除了gather指令外，
+  整个SIMD进程管理对齐的内存访问。
+  
+\begin{figure}
+  \includegraphics[width=\linewidth]{assets/fig2.png}
+  \caption{
+    针对 AVX2 优化的$\mathbb{GF}(8)$和$\mathbb{GF(16)}$译码器中的置换函数源代码。
+    TABLE\_GF\_MUL 是存储了 $q\times{q}$ 预计算偏移量值数组的内存基地址。
+  }\label{fig:2}
+\end{figure}
+
+  对于$\mathbb{GF}(16)$乘法，操作是相似的。不过由于要重新排序的$M_{ij}$向量值
+  是$\mathbb{GF}(8)$使用的值的两倍，因此操作的数量增加了一倍。对于更高阶数的伽罗瓦，
+  过程是相同的。
+
+\subsubsection{域变换}
+
+\begin{figure*}[hbp] % figure* 下不用stfloats的话只有 tp 有效
+  \centering
+  \subfigure{
+    \begin{minipage}{0.45\linewidth}
+      \centering
+      \includegraphics[width=\linewidth]{assets/fig3a.png}
+    \end{minipage}
+  }
+  \subfigure{
+    \begin{minipage}{0.45\linewidth}
+      \centering
+      \includegraphics[width=\linewidth]{assets/fig3b.png}
+    \end{minipage}
+  }
+  \caption{
+    \textbf{a}：$FHT_{\mathbb{GF}(8)}$过程的原始算法；
+    \textbf{b}：$FHT_{\mathbb{GF}(8)}$ 过程的修改后的算法。
+  }
+  \label{fig:3}
+\end{figure*}
+
+  根据\cite{noauthor_andrade_nodate}中的结果，NB-LDPC译码过程的吞吐量瓶颈是傅立叶域变换。
+  它抛弃了CN处理中的卷积计算，但仍然有着密集的计算。在\cite{noauthor_andrade_nodate}中，
+  选择了快速阿达玛变换（FHT），因为它的计算复杂度有限，并且只需要简单的运算（加法和减法），
+  而不影响纠错性能。加法和减法按照图 \ref{fig:3}a 所示的$FHT_{\mathbb{GF}(8)}$蝶形图执行。在这个数据流图中，
+  $e_i$是$FHT_{\mathbb{GF}(8)}$的输入，$E_i$是处理的输出，并且处理是标量操作。
+
+  该算法由3组8个可并行执行的计算组成。不过，它并不对SIMD友好，因为它是由加法和减法组成的，
+  而SIMD编程模型不支持这种并行性。SIMD处理后的总值必须只经过同一种操作（加法或减法）。
+
+  因此，我们修改了原始$FHT$算法来满足这一SIMD约束。新的算法中，减法被加法代替，
+  而一个操作数被取相反数，以保持$FHT$算法功能。处理后的新算法如图 \ref{fig:3}b 所示，
+  其中符号反转由−1乘法表示，不变的操作数则乘以1。尽管这种新的公式需要乘法，但它提供了
+  规则的运算组，这使其能从SIMD特性中获益。注意，为了实现效率，乘法运算被异或运算取代。
+  在二进制掩码下，异或和乘法效果相同。
+
+  图 \ref{fig:4} 提供了对 AVX2 优化的 $FHT_{\mathbb{GF}(8)}$和$FHT_{\mathbb{GF}(16)}$函数源代码。
+  其中$m_0$、$m_1$和$m_2$是预先计算的256位二进制掩码，用于反转浮点数符号。代码中寄存器
+  的数量有限，且执行的指令具有较低的处理延迟。把输入的内存加载和存储结果时的内存写入算在内的话，
+  实现$FHT_{\mathbb{GF}(8)}$处理需要十几条指令。INTEL IACA工具
+  \footnote{该工具依据延迟估计，提供了一个处理延迟的理想估计，但不含内存读写惩罚。不过，该工具还提供了指令级的并行和处理瓶颈等方面的有用信息。}
+  估计此任务的处理延迟为15个时钟周期。
+
+\begin{figure}
+  \includegraphics[width=\linewidth]{assets/fig4.png}
+  \caption{
+    $\mathbb{GF}(8)$和$\mathbb{GF(16)}$译码器中 FHT 函数的源代码。
+  }\label{fig:4}
+\end{figure}
+
+  更高阶的FHT通过分层分解该处理来获得。$FHT_{\mathbb{GF}(16)}$处理需要两个SIMD加法、
+  两个SIMD减法和两次$FHT_{\mathbb{GF}(8)}$操作。图 \ref{fig:4} 还提供了对AVX2优化的
+  $FHT_{\mathbb{GF}(16)}$函数源代码。这个$FHT_{\mathbb{GF}(16)}$函数的内联版本由26条指令组成，
+  其处理延迟估计为30个时钟周期。不过，由于这些计算涉及缓慢的FHT处理实现，
+  编译器的自动矢量化功能不能自动矢量化这些计算。
+
+  对于较高的$\mathbb{GF}$阶，处理效率也更低。例如，$FHT_{\mathbb{GF}(64)}$处理
+  只需要79个时钟周期，而$FHT_{\mathbb{GF}(256)}$处理需要268个时钟周期。实际上，
+  从$FHT_{\mathbb{GF}(256)}$到$FHT_{\mathbb{GF}(16)}$，所有的计算都可以通过对
+  SIMD寄存器中的预加载值进行矢量化的加法和减法来实现。矢量化的加法和减法指令
+  在x86体系结构上得到了高效的实现。它们只消耗三个时钟周期，而数据吞吐量只要一个周期。
+  它们提供了一个规则的计算流。在三个较低的阶（$FHT_{\mathbb{GF}(8)}$，$FHT_{\mathbb{GF}(4)}$
+  以及$FHT_{\mathbb{GF}(2)}$）中，我们使用用加法代替减法运算，然后利用异或掩码反转结果符号。
+  此外，需要打乱数据来驱动正确的操作数进行计算。在x86体系结构中，符号反转（带掩码的异或操作）
+  和打乱数据也有有效的管理。这些矢量化指令的延迟为1个时钟周期。
+
+  这些结果强调了这样一个事实：$FHT_{\mathbb{GF}}$能够在x86体系结构上高效地实现，
+  而由于共享内存访问冲突，它在GPU设备上的实现具有挑战性\cite{noauthor_andrade_nodate,andrade_optimized_2014}。
+  但是，由于SIMD寄存器较少，当$m$大于7时，处理效率会降低。
+
+\subsubsection{CN 消息处理}
+
+  为了从输入的$\tilde{M}^t_{ji}$消息中计算得到$\tilde{M}^t_{ji}$消息，我们应用了
+  Forward-Backward算法\cite{noauthor_wymeersch_nodate}（算法1：行15到17）。
+  每个消息等于除其自身值以外的所有$\tilde{M}^t_{ij}$消息的乘积。Forward-Backward算法
+  将数据处理分为3层，每层需要$d_{c_j}$次消息乘法\cite{boutillon_design_2013}。
+  每个消息乘法都涉及$q$对齐的标量乘法，由于标量值是内存对齐的，因此可以有效地利用SIMD功能。
+
+  NB-LDPC码的FFT-SPA解码算法所涉及的整体处理有效地利用了x86 SIMD特性，如本小节所示。
+  与在$m\in[7,8]$才能提供最佳吞吐量效率的GPU实现相反，当$m\in[3,6]$时，在x86体系结构上
+  的实现能取得最佳效果。不过，即便$m\in[7,8]$，吞吐量效率仍然很高，如下一节所示。
+
+\subsection{粗粒度并行优化}
+
+  当前的x86体系结构包括多个物理和逻辑处理核心。为了从$P$个处理器核中获益，
+  最有效的方法是在每个处理器核上执行一个解码器，如\cite{gal_high-throughput_2016}所示。
+  而想要在一个解码器中利用多个核心是不可能的，通常执行时间的改进还不及核心同步所花费的时间。
+
+  为了并行管理多个解码器的执行，C++11 的线程特性被应用于通用的方式来实现多核执行，
+  从而就能创建可伸缩的适应性解码器并使其适应处理器架构。
+
+  从理论上讲，$P$（物理核数）的加速系数是可能的，但实际增益通常较低。实际上，一些体系结构
+  元素（如内存带宽和L3内存缓存）在不同的处理器内核之间共享，这引入了执行时间惩罚。
+  但如实验结果部分所示，这些惩罚仍然是有限的。
+
 \section{实验结果}\label{sec:experiment}
 \subsection{吞吐量和延迟性能}
 \subsubsection{简介}\label{sssec:experiment11}
+
+  首先评估了在x86处理器上实现NB-LDPC解码器的效率。为此，我们首先选择了未来CCSDS代码\cite{CCSDS_2015}
+  的一部分，$\mathbb{GF}(256)$。根据\cite{dolecek_non-binary_2014}提供的$\mathbb{GF}(256)$
+  $H$矩阵和\cite{poulliat_design_2008}中的$\alpha$值，设计了两个类似于CCSDS的$\mathbb{GF}(16)$码
+  \footnote{$\mathbb{GF}(16)$的CCSDS码目前还未确定。}。最后我们还从\cite{noauthor_helmling_nodate}
+  中选出一个$\mathbb{GF}(64)$码（$N=384，K=192$）用于$\mathbb{GF}(64)$基准测试。
+  首先，我们在不激活提前终止准则的情况下执行软件解码器实现的实验，并估计了它对译码性能的影响。
+  
+  这些代码的吞吐量和延迟评估在三个具有不同特点的实验平台上进行：
+\begin{itemize}
+  \item 第一个平台（$P_1$）是一台简单的台式计算机，安装了2017年一季度开售的INTEL Core-i7 7700T CPU。
+  处理器有4个物理核和4个逻辑核。它的工作时钟频率由芯片组在2.90 GHz到3.8 GHz间自动调节。
+  它还有8 MB的共享L3 SmartCache内存。$P_1$平台的功耗约为35瓦。 
+  \item 第二个平台（$P_2$）是安装了两枚2014年第3季度开售的Xeon E5-2680v3 CPU的服务器。
+  每个Xeon处理器有12个物理核和12个逻辑核，共享30 MB的SmartCache内存。所有处理器内核
+  都以2.5 GHz的恒定工作频率运行。$P_2$平台的功耗约为240瓦。
+  \item 第三个平台（$P_3$）是最新的x86服务器，安装了2017年第三季度开售的Intel Xeon Platinum 8180 CPU。
+  Xeon Platinum处理器工作在2.5 GHz，且有28个物理核和28个逻辑核。睿频功能可以提高其工作频率
+  高达3.8 GHz。为了在28个处理器内核之间共享信息，其使用了38 MB的L3共享内存。$P_3$的功耗约为205瓦。
+\end{itemize}
+  
+  用CLAN 6、CLAN 3.8和英特尔2018 C++编译器分别编译了NB-LDPC解码器的C++源代码[5 ]，分别为P1、P2和P3平台。为了基准测试目的，解码器在30秒内运行以估计空气吞吐量和解码延迟。[6 ]运行时间测量由C++ 11计时API完成。测量包括在解码器存储器中加载信道值所需的延迟以及将结果检索回系统存储器所需的时间。表3给出了10次无停止准则分层解码迭代的吞吐量（，Mbps）和延迟（，μs）结果。
 
 正文部分, 字体为5号宋体。
 
