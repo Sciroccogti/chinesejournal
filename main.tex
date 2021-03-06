@@ -12,9 +12,10 @@
 \usepackage{algorithmic}
 \usepackage{subfigure}
 \usepackage{stfloats}
+\usepackage{lscape}
 \begin{document}
 
-\title{基于x86多核处理器的高通量多元LDPC码FFT-SPA译码器的实现}
+\title{基于x86多核处理器的高通量多元LDPC码FFT-SPA解码器的实现}
 \author{Bertrand Le Gal\footnote{IMS Lab., Univ. Bordeaux, Bordeaux INP, CNRS UMR 5218, France} \and Christophe Jego\footnotemark[1]}
 
 \maketitle
@@ -26,12 +27,12 @@
   会（CCSDS）在下一代上行链路实验规范（CCSDS \citeyear{CCSDS_2014}、\citeyear{CCSDS_2015}）
   中采用NB-LDPC码的主要原因。NB-LDPC码对短帧具有较高的纠错效率，因此该码是物联网应用的理想选择。
   然而，这种性能上的增益是以解码计算复杂度为代价的（CCSDS \citeyear{CCSDS_2014}; CondeCanencia etal. \citeyear{comparison_NBLDPC}）。
-  本文给出了一个x86多核NB-LDPC译码器的实现。与GPU（图形处理单元）设备上最高效的
-  工作相比，这一实现FFT-SPA算法的译码器的吞吐量提高了约1.3倍到2.7倍，延迟减少了
+  本文给出了一个x86多核NB-LDPC解码器的实现。与GPU（图形处理单元）设备上最高效的
+  工作相比，这一实现FFT-SPA算法的解码器的吞吐量提高了约1.3倍到2.7倍，延迟减少了
   95\%以上，功耗降低了一半。实际上，在x86架构上进行高效的内存映射和计算优化的话，
   可以实现比基于类似实验设置的GPU更高的解码吞吐量。因此，吞吐量效率、低功耗下的
   低处理延迟使得本文所提出的多核方案对于用于CCSDS标准和未来物联网应用中的SDR、
-  Cloud-RAN系统中的NB-LDPC译码器的实时实现极具现实意义。\medskip\newline
+  Cloud-RAN系统中的NB-LDPC解码器的实时实现极具现实意义。\medskip\newline
   \textbf{关键字 }多元LDPC码，FFT-SPA，多核，SIMD，纠错码
 
 \end{abstract}
@@ -52,23 +53,23 @@
   甚至对于地面基带站也是如此。实际上，基于 ASIC 的方案提供了最佳的面积、功耗和吞吐量特性。
   但是，它们的运行时灵活性低，开发周期长。为了解决这一问题，研究了基于FPGA的体系结构设计。
   而这些目标具有计算并行性强和低功耗的优点。然而，基于FPGA的硬件实现也具有有限的灵活性，
-  并且设计周期也过长。另一方面，ASIC 和 FPGA 的实现都是基于近似的译码算法，
+  并且设计周期也过长。另一方面，ASIC 和 FPGA 的实现都是基于近似的解码算法，
   这使得架构成本最小化的同时给纠错能力带来了负面影响。
 
-  大规模并行可编程器件在获得很大进步和发展后，已被用于许多纠错码的译码器实现中，
+  大规模并行可编程器件在获得很大进步和发展后，已被用于许多纠错码的解码器实现中，
   例如二进制LDPC码\cite{chang_accelerating_2011,falcao_portable_2012,noauthor_wang_nodate-1,li_efficient_2013,lin_high_2014,gal_high-throughput_2016,andrade_survey_2016}
   、NB-LDPC码\cite{noauthor_wang_nodate,noauthor_andrade_nodate,noauthor_beermann_nodate,andrade_optimized_2014,noauthor_thi_nodate,beermann_gpu_2015,noauthor_pham_nodate,liu_high-throughput_2018}
   和极性码\cite{noauthor_gal_nodate,gal_multi-gbs_2015,giard_low-latency_2018}。
-  这些软件译码器的设计可达到Mbps或Gbps的吞吐量，也能够提供软件无线电（SDR）\cite{grayver_implementing_2013}
+  这些软件解码器的设计可达到Mbps或Gbps的吞吐量，也能够提供软件无线电（SDR）\cite{grayver_implementing_2013}
   系统所需的灵活性。
 
-  许多最近的研究工作专注于NB-LDPC译码器在GPU设备上的软件实现\cite{noauthor_wang_nodate,noauthor_andrade_nodate,noauthor_beermann_nodate,andrade_optimized_2014,noauthor_thi_nodate,beermann_gpu_2015,noauthor_pham_nodate,liu_high-throughput_2018}。
-  虽然二进制LDPC译码器在GPU和多核目标上的高效实现已经比较理想\cite{chang_accelerating_2011,falcao_portable_2012,noauthor_wang_nodate-1,li_efficient_2013,lin_high_2014,gal_high-throughput_2016,andrade_survey_2016}，
-  但是NBLDPC码却相去甚远。实际上，NB-LDPC译码算法与二进制LDPC译码算法有很大的不同。
+  许多最近的研究工作专注于NB-LDPC解码器在GPU设备上的软件实现\cite{noauthor_wang_nodate,noauthor_andrade_nodate,noauthor_beermann_nodate,andrade_optimized_2014,noauthor_thi_nodate,beermann_gpu_2015,noauthor_pham_nodate,liu_high-throughput_2018}。
+  虽然二进制LDPC解码器在GPU和多核目标上的高效实现已经比较理想\cite{chang_accelerating_2011,falcao_portable_2012,noauthor_wang_nodate-1,li_efficient_2013,lin_high_2014,gal_high-throughput_2016,andrade_survey_2016}，
+  但是NBLDPC码却相去甚远。实际上，NB-LDPC解码算法与二进制LDPC解码算法有很大的不同。
   这意味着以前的优化策略不能直接移植。因此，针对GPU目标，研究人员提出了另外的并行化策略。
   由于解码算法的主要差异，还必须在多核体系结构上重新设计它们。第一批研究\cite{noauthor_andrade_nodate,noauthor_beermann_nodate,andrade_optimized_2014,beermann_gpu_2015,liu_high-throughput_2018}
   集中于在GPU目标上实现具有高纠错性能的NB-LDPC解码算法，用于只关注纠错性能的应用。
-  使用5次分层译码迭代后，GPU上的吞吐率从1Mbps提高到了228Mbps。然而，处理延迟显著增加：
+  使用5次分层解码迭代后，GPU上的吞吐率从1Mbps提高到了228Mbps。然而，处理延迟显著增加：
   当选择最有效的吞吐量设置时，延迟在21 ms到123 ms不等\cite{liu_high-throughput_2018}。
   第二批研究\cite{noauthor_wang_nodate,noauthor_thi_nodate,noauthor_pham_nodate}
   集中于在GPU设备上实现解码启发式算法。然而，即便有较低的计算复杂度，与基于初始公式的解码吞吐量相比，
@@ -77,24 +78,24 @@
   例如缓慢的全局内存、有限的共享内存等，及其相关的编程模型，这些限制造成实现NB-LDPC
   解码算法极具挑战性。
 
-  本文详细介绍了另一种基于x86多核结构的NB-LDPC译码器的软件实现。本文选择FFT-SPA算法是因为它比最小和或SPA译码算法具有更低的计算复杂度和更高的纠错性能
-  \footnote{尽管优化过的SPA和最小和译码器不是本文重点，但仍对其进行了实现和测试。在“实验”一章中有一栏对这些算法进行了性能比较。}。
+  本文详细介绍了另一种基于x86多核结构的NB-LDPC解码器的软件实现。本文选择FFT-SPA算法是因为它比最小和或SPA解码算法具有更低的计算复杂度和更高的纠错性能
+  \footnote{尽管优化过的SPA和最小和解码器不是本文重点，但仍对其进行了实现和测试。在“实验”一章中有一栏对这些算法进行了性能比较。}。
   x86处理器的编程模型和结构特点与GPU不同。尽管与GPU设备相比，该算法的处理单元较少，
   但它似乎更好地利用了x86多核特性，就像其他ECC码族一样\cite{gal_high-throughput_2016,noauthor_wang_nodate-1,noauthor_cassagne_nodate}。
   此外，该解码器的吞吐量比大多数相关成果都要高\cite{noauthor_andrade_nodate,noauthor_beermann_nodate,andrade_optimized_2014,beermann_gpu_2015,liu_high-throughput_2018}。
   特别是在服务器级x86 CPU上，总能得到更好的吞吐量、延迟和功耗特性。
   为了达到这个性能水平，本文采用了不同的并行化策略和算法优化。实验结果表明，
-  所提出的NB-LDPC软件译码器实现方案在吞吐量、延迟和能量消耗方面比基于GPU的实现更具竞争力。
+  所提出的NB-LDPC软件解码器实现方案在吞吐量、延迟和能量消耗方面比基于GPU的实现更具竞争力。
   功耗的降低和低延迟的特性使得该实现更适合于SDR系统。与第一个借助OpenCL语言\cite{noauthor_wang_nodate}
   实现的x86软件解码器实现相比，本文提出的软件解码器实现直接利用了SIMD和多核特性，
   使其比\cite{noauthor_wang_nodate}中给出的x86实现快1000倍以上。
 
-  论文的其余部分组织如下。第 \ref{sec:decoding} 节介绍了NB-LDPC码、FFT-SPA译码算法
-  以及在GPU上实现NB-LDPC译码器的相关工作。然后，第 \ref{sec:fftspa} 节详细介绍了
+  论文的其余部分组织如下。第 \ref{sec:decoding} 节介绍了NB-LDPC码、FFT-SPA解码算法
+  以及在GPU上实现NB-LDPC解码器的相关工作。然后，第 \ref{sec:fftspa} 节详细介绍了
   目标x86多核平台以及我们的并行化和优化方法。最后，在第 \ref{sec:experiment} 节中
   提供了性能分析和与相关工作的横向对比。
 
-\section{NB-LDPC 码的译码}\label{sec:decoding}
+\section{NB-LDPC 码的解码}\label{sec:decoding}
 \subsection{简介}
 
   $(N,K)$ NB-LDPC 码是一种由稀疏奇偶校验矩阵 $H$ 定义的线性分组码，其中非零元素属于
@@ -132,7 +133,7 @@
   包含了含有符号$x_i$的$d_{v_i}$校验方程。排除由符号$/$表示，例如，$\Psi(x_i)/c_j$表示
   除$c_j$外的$\Psi(x_i)$检验方程组。
 
-  与二进制 LDPC 译码类似，NB-LDPC 译码基于消息传递算法执行。最佳纠错性能是通过执行
+  与二进制 LDPC 解码类似，NB-LDPC 解码基于消息传递算法执行。最佳纠错性能是通过执行
   Sum-Product算法\cite{carrasco_non-binary_2008}（SPA）或其等效公式（如FFT-SPA\cite{carrasco_non-binary_2008}）获得的。
   FFT-SPA 解码算法的优点之一，是由于去除消息卷积而使得处理 CN 的计算复杂度降低。
   这种改进是在不影响解码性能的情况下获得的，因为它们在数学上是等价的\cite{comparison_NBLDPC}。
@@ -228,26 +229,26 @@
   中提到的方法相比，它增加了解码吞吐量，从而实现了等效的纠错性能。
   然而，对于 $\mathbb{GF}(16)$ 到 $\mathbb{GF}(256)$ NB-LDPC 码，所测量的解码
   吞吐量仍然低于 0.5 Mbps。最近，在\cite{liu_high-throughput_2018}中提出了一种高效的
-  基于 GPU 的解码器实现。在考虑 GPU 特性的基础上，找到了 FFT-SPA 译码算法的有效实现。
+  基于 GPU 的解码器实现。在考虑 GPU 特性的基础上，找到了 FFT-SPA 解码算法的有效实现。
   基于分层的调度与高端 GPU 设备的组合使得能够针对 $\mathbb{GF}(16)$ NB-LDPC 码获得
   228 Mbps 的峰值吞吐量和 123 ms 的处理延迟。
 
   第二批工作\cite{noauthor_wang_nodate,noauthor_thi_nodate,noauthor_pham_nodate}
   集中于 SPA 解码算法的简化版本。不过，SPA 和 FFT-SPA 解码算法由于其高计算复杂度
-  而不满足硬件结构设计约束。此后，为了便于 NB-LDPC 译码器的硬件实现，提出了一些
-  低复杂度的译码算法：MinSum\cite{declercq_decoding_2007}、Min-Max\cite{declercq_decoding_2007}
-  和 Extended Min-Sum\cite{noauthor_voicila_nodate}。在这些译码算法中，$\mathbb{R}$中
+  而不满足硬件结构设计约束。此后，为了便于 NB-LDPC 解码器的硬件实现，提出了一些
+  低复杂度的解码算法：MinSum\cite{declercq_decoding_2007}、Min-Max\cite{declercq_decoding_2007}
+  和 Extended Min-Sum\cite{noauthor_voicila_nodate}。在这些解码算法中，$\mathbb{R}$中
   的乘法和除法运算被转换成加法、减法和最小/最大运算。一些基于 GPU 的实现\cite{noauthor_wang_nodate,noauthor_thi_nodate,noauthor_pham_nodate}
   侧重于 min-max 解码技术。事实上，低计算复杂度似乎更好地在GPU设备上实现。需要注意的是，
   与基于 SPA 的算法相比，min-max 算法对纠错性能也有负面影响。然而，即使具有较低的计算复杂度，
   对于 $\mathbb{GF}(32)$ NB-LDPC 码，GPU 实现也未能达到高于 0.7 Mbps 的吞吐量。
   这种效率问题来自于 CN 计算中涉及的卷积式处理。
 
-  总的来说，在 GPU 实现的相关工作表明，NB-LDPC 译码过程具有较高的计算并行度。
+  总的来说，在 GPU 实现的相关工作表明，NB-LDPC 解码过程具有较高的计算并行度。
   因此，，它可以借助多核实现加速。然而，与 GPU 设备相关联的架构约束和编程模型似乎
   限制了 NB-LDPC 解码器在解码吞吐量和延迟方面的实现效率。因此，在本文中，我们重点
   讨论了这样一个多核体系结构，它提供了不同的编程模型和其他体系结构约束。实验结果表明，
-  NB-LDPC 译码算法的计算并行度非常适合 x86 处理器。
+  NB-LDPC 解码算法的计算并行度非常适合 x86 处理器。
 
 \section{FFT-SPA 算法实现}\label{sec:fftspa}
 \subsection{选定的多核架构}
@@ -261,7 +262,7 @@
   并行化方法主要适用于不需要条件语句或分支语句的情况下，大量数据需要相同处理的计算序列。
   此外，还可以使用多指令多数据（MIMD）功能。它为不同的计算序列或程序在不同的数据集
   上并行执行提供了机会。因此，它使得并行帧处理成为可能。下一节将详细介绍
-  利用 SIMD 和 MIMD 特性提出的 FFT-SPA 实现和优化选择\footnote{实现NB-LDPC 译码器的源代码将会在 GitHub 上开源}。
+  利用 SIMD 和 MIMD 特性提出的 FFT-SPA 实现和优化选择\footnote{实现NB-LDPC 解码器的源代码将会在 GitHub 上开源}。
 
 \subsection{并行化策略}
 
@@ -274,7 +275,7 @@
   需要对 CN 内核进行特殊的调度。其实，并行执行的 CN 可以访问不同的 VN 元素。
   \item $S_3$ 策略包括对单个CN内核的并行计算。对于二进制LDPC解码器的软件实现，
   由于CN元素的计算复杂度较低，$S_3$策略被丢弃\cite{gal_high-throughput_2016}。
-  不过，对于NB-LDPC译码算法，由于$\mathbb{GF}(q),q\geq{Q}$，CN核的计算复杂度很高，
+  不过，对于NB-LDPC解码算法，由于$\mathbb{GF}(q),q\geq{Q}$，CN核的计算复杂度很高，
   并且内存访问是规则的。因此，它使$S_3$策略更为合适。
 \end{itemize}
 
@@ -348,7 +349,7 @@
   使得通过最小化全局内存访问来实现有效利用内存缓存变得可能。
 
   合理的内存需求和计算并行化潜力表明INTEL多核体系结构较适合FFT-SPA算法的实现。
-  下面详细介绍了译码算法中各个处理任务的实现和优化。
+  下面详细介绍了解码算法中各个处理任务的实现和优化。
 
 \subsection{实现方案选择与优化}
 
@@ -419,7 +420,7 @@
 \begin{figure}
   \includegraphics[width=\linewidth]{assets/fig2.png}
   \caption{
-    针对 AVX2 优化的$\mathbb{GF}(8)$和$\mathbb{GF(16)}$译码器中的置换函数源代码。
+    针对 AVX2 优化的$\mathbb{GF}(8)$和$\mathbb{GF(16)}$解码器中的置换函数源代码。
     TABLE\_GF\_MUL 是存储了 $q\times{q}$ 预计算偏移量值数组的内存基地址。
   }\label{fig:2}
 \end{figure}
@@ -451,7 +452,7 @@
   \label{fig:3}
 \end{figure*}
 
-  根据\cite{noauthor_andrade_nodate}中的结果，NB-LDPC译码过程的吞吐量瓶颈是傅立叶域变换。
+  根据\cite{noauthor_andrade_nodate}中的结果，NB-LDPC解码过程的吞吐量瓶颈是傅立叶域变换。
   它抛弃了CN处理中的卷积计算，但仍然有着密集的计算。在\cite{noauthor_andrade_nodate}中，
   选择了快速阿达玛变换（FHT），因为它的计算复杂度有限，并且只需要简单的运算（加法和减法），
   而不影响纠错性能。加法和减法按照图 \ref{fig:3}a 所示的$FHT_{\mathbb{GF}(8)}$蝶形图执行。在这个数据流图中，
@@ -476,7 +477,7 @@
 \begin{figure}
   \includegraphics[width=\linewidth]{assets/fig4.png}
   \caption{
-    $\mathbb{GF}(8)$和$\mathbb{GF(16)}$译码器中 FHT 函数的源代码。
+    $\mathbb{GF}(8)$和$\mathbb{GF(16)}$解码器中 FHT 函数的源代码。
   }\label{fig:4}
 \end{figure}
 
@@ -534,7 +535,7 @@
   $H$矩阵和\cite{poulliat_design_2008}中的$\alpha$值，设计了两个类似于CCSDS的$\mathbb{GF}(16)$码
   \footnote{$\mathbb{GF}(16)$的CCSDS码目前还未确定。}。最后我们还从\cite{noauthor_helmling_nodate}
   中选出一个$\mathbb{GF}(64)$码（$N=384，K=192$）用于$\mathbb{GF}(64)$基准测试。
-  首先，我们在不激活提前终止准则的情况下执行软件解码器实现的实验，并估计了它对译码性能的影响。
+  首先，我们在不激活提前终止准则的情况下执行软件解码器实现的实验，并估计了它对解码性能的影响。
   
   这些代码的吞吐量和延迟评估在三个具有不同特点的实验平台上进行：
 \begin{itemize}
@@ -550,10 +551,10 @@
 \end{itemize}
   
   我们用 clang 6.0、clang 3.8 和英特尔 2018 C++编译器分别在$P_1$、$P_2$和$P_3$三个平台编译了NB-LDPC解码器的C++源代码
-  \footnote{NB-LDPC译码器实现的源代码将会在GitHub上同作者之前的代码一样开源。}。
+  \footnote{NB-LDPC解码器实现的源代码将会在GitHub上同作者之前的代码一样开源。}。
   为了进行基准测试，解码器运行了30秒以估计吞吐量和解码延迟。
-  \footnote{为了进行多线程实验，C++11 的线程特性被用于分配 $Q$ 个不同的线程来并行执行 $Q$ 个译码器，并且这些译码器的数据和控制都相互独立。
-  系统的吞吐量是这 $Q$ 个译码器的吞吐量总和，解码延迟则取各译码器的平均值。}运行时测量由C++ 11 Chrono API完成。
+  \footnote{为了进行多线程实验，C++11 的线程特性被用于分配 $Q$ 个不同的线程来并行执行 $Q$ 个解码器，并且这些解码器的数据和控制都相互独立。
+  系统的吞吐量是这 $Q$ 个解码器的吞吐量总和，解码延迟则取各解码器的平均值。}运行时测量由C++ 11 Chrono API完成。
   测量包含了在解码器内存中加载信道值所花费的延迟以及将结果导回系统内存所需的时间。
   表\ref{tab:3}给出了10次无停止准则分层解码迭代的吞吐量（$\Gamma$，Mbps）和延迟（$\Delta$，$\mu$s）结果。
 
@@ -561,6 +562,7 @@
   \caption{$P_1$、$P_2$和$P_3$平台上FFT-SPA解码器实现的吞吐量和延迟性能取决于使用的核的数量。}
   \label{tab:3}
   \centering
+  \setlength\tabcolsep{6.5pt}% 调整列间距
   \begin{tabular}{llllllllllllll}
     \toprule
     &&\multicolumn{4}{c}{$P_1$}&\multicolumn{4}{c}{$P_2$}&\multicolumn{4}{c}{$P_3$}\\
@@ -583,7 +585,7 @@
   $P_1$平台只使用单处理器核心的吞吐量结果如表\ref{tab:3}中所示，范围从0.90到5.66 Mbps。
   与许多GPU实现（即\cite{noauthor_andrade_nodate}）相反，最佳吞吐量性能是在较低$\mathbb{GF}$值
   （即$\mathbb{GF}(16)$）的NB-LDPC码取得。实际上，这些码比$\mathbb{GF}(256)$中的码
-  具有更低的译码复杂度。此外，$\mathbb{GF}(16)$码译码时有效地填充了AVX2 SIMD的单元流水线。
+  具有更低的解码复杂度。此外，$\mathbb{GF}(16)$码解码时有效地填充了AVX2 SIMD的单元流水线。
   若各自提升$\mathbb{GF}$阶数，$\mathbb{GF}(16)$码和$\mathbb{GF}(16)$码的吞吐量
   下降分别是2倍和6倍。这种性能下降主要是由两个因素造成的：
 \begin{enumerate}
@@ -592,7 +594,7 @@
 \end{enumerate}
 
   在$P_1$平台上，解码延迟根据码长（N）和$\mathbb{GF}$阶数从26$\mu$s到798$\mu$s不等。
-  与最初只启用了编译器自动矢量化的C++版本的NB-LDPC解码器相比，译码吞吐量有所提高。
+  与最初只启用了编译器自动矢量化的C++版本的NB-LDPC解码器相比，解码吞吐量有所提高。
   事实上，即使最初的解码器描述被设计成支持编译器自动矢量化的话，也可以观察到十倍的加速，
   并且与$\mathbb{GF}$阶数无关。
   
@@ -608,14 +610,14 @@
     \item 生成描述的某些部分是为了尽可能消除运行时计算（例如$\mathbb{GF}$乘法和除法表）
     或循环结构。并行化策略和应用的优化效率与在\cite{noauthor_wang_nodate}中提出的OpenCL x86解码器相比，
     大大提升了吞吐量\footnote{\cite{noauthor_wang_nodate}中报告的吞吐量大约为20 kbps，
-    而对于同一NB-LDPC码，我们提出的译码器吞吐量大约为3 Mbps。不过\cite{noauthor_wang_nodate}
-    中并未详细提供有关x86 OpenCL译码器实现的实验设置，因此我们无法进行进一步的比较。}。
+    而对于同一NB-LDPC码，我们提出的解码器吞吐量大约为3 Mbps。不过\cite{noauthor_wang_nodate}
+    中并未详细提供有关x86 OpenCL解码器实现的实验设置，因此我们无法进行进一步的比较。}。
   \end{enumerate}
 
   在多核配置中，当激活4个物理处理器内核时，吞吐量有所提高，从3.18提升到了19.99 Mbps。
   因此，大约4的加速倍率证明了所提出的解码器根据多核架构的可扩展性。在多核配置中涉及的些许惩罚
   也由虚处理延迟的增加证明了。实际上，并行解码器之间缺乏控制同步以及L3内存共享所涉及的
-  可忽略不计的惩罚\footnote{这是由于帧内并行化策略带来的低内存占用的译码器性能。}
+  可忽略不计的惩罚\footnote{这是由于帧内并行化策略带来的低内存占用的解码器性能。}
   使得多核设备得到了有效利用。另外还进行了一些实验来评估4个逻辑核心的不同投入。
   这4个核与4个物理核共享相同的处理单元。我们以增加大约20\%的解码延迟为代价，吞吐量提高了20\%。
   这是一个合乎逻辑和预测的结果：提高功能单元的使用率能够提供更高的吞吐量性能。
@@ -626,8 +628,8 @@
   \footnote{与其他平台的 Skylake 架构不同，$P_2$的架构为 Haswell。Skylake架构将
   Haswell下耗费5个和17个时钟周期的浮点乘法和浮点除法优化到了4个和11个时钟周期。}
   然而，由于$P_2$平台中有大量的物理处理器核，吞吐量从2.5倍提高到5倍。$\mathbb{GF}(16)$码
-  的译码吞吐量约为75 Mbps，$\mathbb{GF}(64)$码的译码吞吐量约为24 Mbps，$\mathbb{GF}(256)$码
-  的译码吞吐量约为8 Mbps。它们几乎比单核配置高21倍。处理延迟则受到多核配置的轻微影响，
+  的解码吞吐量约为75 Mbps，$\mathbb{GF}(64)$码的解码吞吐量约为24 Mbps，$\mathbb{GF}(256)$码
+  的解码吞吐量约为8 Mbps。它们几乎比单核配置高21倍。处理延迟则受到多核配置的轻微影响，
   不过大多数情况下解码延迟都低于1 ms。
 
   最后，正如我们所料，在$P_3$平台上获得的性能是最有趣的。当只有一个核心处于活动状态时，
@@ -637,13 +639,7 @@
   而处理延迟相似（从31 $\mu$s到620 $\mu$s）。分配所有28个核心能达到26倍加速。
   它展现了所提出的方法在高端处理器上的可扩展性。
 
-\subsubsection{提前停止方案的性能测试结果}
-
-  当找到有效码字时，NB-LDPC解码过程可以停止。因此，当信噪比增加时，停止准则的实现
-  有助于增加解码吞吐量并减少解码延迟。这种机制已在所提出的解码器中实现。
-  它并不会影响解码器最坏情况下的执行时间，但有效地提高了其平均吞吐量和延迟性能，如图\ref{fig:5}所示。
-
-\begin{figure*}
+\begin{figure*}[htp]
   \includegraphics[width=\linewidth]{assets/fig5.png}
   \caption{
     启用提前停止准则时测量到的吞吐量：\\
@@ -655,10 +651,115 @@
   }\label{fig:5}
 \end{figure*}
 
-  由于采用了提前停止准则，平均译码迭代次数明显减少，同时信噪比增大。这使得所提出的
+\subsubsection{提前停止方案的性能测试结果}
+
+  当找到有效码字时，NB-LDPC解码过程可以停止。因此，当信噪比增加时，停止准则的实现
+  有助于增加解码吞吐量并减少解码延迟。这种机制已在所提出的解码器中实现。
+  它并不会影响解码器最坏情况下的执行时间，但有效地提高了其平均吞吐量和延迟性能，如图\ref{fig:5}所示。
+
+  由于采用了提前停止准则，平均解码迭代次数明显减少，同时信噪比增大。这使得所提出的
   解码器的平均解码吞吐量增加。以平台$P_3$为例，当信噪比为3 dB且分配所有物理处理器核心时，
   对于$\mathbb{GF}(16)$、$\mathbb{GF}(64)$和$\mathbb{GF}(256)$的NB-LDPC码，
   吞吐量分别达到705 Mbps、284 Mbps和110 Mbps。
+
+\subsubsection{在其它多核平台上的性能测试结果}
+
+  本文还介绍了一种基于NEON架构的NB-LDPC解码器，并在ARM Cortex-A15处理器（NVIDIA Tegra K1）
+  上进行了基准测试。与$P_1$平台相比，$\mathbb{GF}(16)$和$\mathbb{GF}(64)$码的吞吐量降低了6倍，
+  $\mathbb{GF}(16)$码的吞吐量降低了10倍。这种性能差距来自：（1）NEON SIMD单元为128位宽，
+  而AVX2为256位宽；（2）ARM处理器的工作频率比$P_1$平台低30\%；（3）NEON指令集缺少一些对
+  NB-LDPC解码有用的内部函数。不过其中一些问题可以在未来的ARM处理器体系结构中得到解决。
+  此外，我们注意到，在ARM处理器上实现软件解码器在每个解码比特的功耗方面很有优势。
+  例如，NVIDIA Tegra K1处理器的功耗比$P_1$平台低十倍。
+
+\subsection{同SPA和最小和解码器实现的比较}
+
+  \cite{declercq_decoding_2007}中提出了一种新的积和算法，以集成FFT变换，从而降低NB-LDPC解码
+  过程的计算复杂度。\cite{noauthor_andrade_nodate}中在GPU上用FFT-SPA算法代替了SPA算法。
+  如第 \ref{sec:decoding} 节所述和\cite{comparison_NBLDPC,noauthor_andrade_nodate}所示，
+  FFT变换通过转换计算复杂度为$O(M\times3\times(d_c−2)\times2^{2\times{m}})$的卷积处理，
+  将CN处理的计算复杂度降低到$O(M\times{d_c}\times{m}\times2^m)$。因此，这个公式
+  理论上说对硬件和软件更友好。不过这个从算法层表达的断言需要验证。所以，本文还研究了
+  SPA解码算法在x86处理器上的并行实现。由于卷积任务提供了计算规则性特性，因此可以受益于SIMD并行化。
+  我们对SPA解码器实现进行了等效的优化工作。例如，SPA解码器实现利用了融合乘法和累加的SIMD特性。
+  我们使用了相同的基准来评估SPA解码器的性能。表 \ref{tab:4} 给出了$P_1$目标上SPA解码器实现的性能结果。
+
+\begin{table*}[htb]
+  \caption{$P_1$平台上SPA和最小和解码器实现的吞吐量和延迟性能。}
+  \label{tab:4}
+  \centering
+  \setlength\tabcolsep{10pt}% 调整列间距
+  \begin{tabular}{llllllllll}
+    \toprule
+    &&\multicolumn{4}{c}{SPA 解码器}&\multicolumn{4}{c}{最小和解码器}\\
+    码&$\mathbb{GF}$&\multicolumn{2}{l}{$\Gamma$（Mbps）}&\multicolumn{2}{l}{$\Delta$（$\mu$s）}&\multicolumn{2}{l}{$\Gamma$（Mbps）}&\multicolumn{2}{l}{$\Delta$（$\mu$s）}\\
+    \cmidrule(r){3-4}\cmidrule(r){5-6}\cmidrule(r){7-8}\cmidrule(r){9-10}%cmidrule(r)可以形成隔断，而cline则不会
+    &&1 core&4 cores&1 core&4 cores&1 core&4 cores&1 core&4 cores\\
+    \midrule
+    32，16&$2^4$&2.57&9.35&49&55&4.01&13.39&31&43\\
+    64，32&$2^4$&4.05&14.39&31&36&5.66&19.48&22&26\\
+    384，192&$2^6$&0.98&3.47&2351&2705&1.07&3.54&2146&2622\\
+    16，8&$2^8$&0.05&0.15&2692&3352&0.06&0.18&2155&2797\\
+    32，16&$2^8$&0.05&0.16&5268&6576&0.06&0.18&4285&5815\\
+    64，32&$2^8$&0.05&0.16&10542&13257&0.06&0.18&8649&12024\\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+  首先，SPA解码器的吞吐量总是低于FFT-SPA解码器。然而，这些性能之间的差异会随着$\mathbb{GF}$变化，
+  类似计算复杂度。$\mathbb{GF}(16)$中SPA解码器的吞吐量性能低于FFT-SPA解码器
+  （SPA解码器比FFT-SPA解码器慢20\%左右）。当$\mathbb{GF}$阶数增加时，SPA解码器的
+  吞吐量性能比FFTSPA解码器受到的影响更大。例如，对于$\mathbb{GF}(64)$ NB-LDPC码，
+  SPA解码器实现要慢上40\%。此外，对于$\mathbb{GF}(256)$ NB-LDPC码，性能差距高达90\%。
+  FFT-SPA解码器的吞吐性能总是优于SPA解码器，这说明\cite{noauthor_andrade_nodate}
+  中针对GPU设备做出的FFT-SPA选择对于x86目标也是明智的，即使SPA解码器实现完全受益于x86 SIMD功能。
+
+  我们基于硬件实现的目的，采用最小和或最小最大近似对SPA解码算法进行了简化。加法、
+  减法和最大值运算是硬件友好的，这与SPA公式中涉及的除法和乘法相反。由于解码算法仍与
+  SPA版本相同，本文提出了最小和算法和最小-最大算法的优化软件解码器实现方案。
+  表 \ref{tab:4} 中报告了最小和软件解码器实现\footnote{最小和以及最小-最大解码器能够提供同等吞吐量和延迟性能，因为加法和最大值运算指令占用的时钟周期是一样的。}
+  获得的吞吐量和延迟性能。浮点加法、减法和最小值运算指令的执行比乘法和除法的执行花费更少的时钟周期。
+  因此，与SPA解码器相比，最小和解码器的吞吐量有所改善。在吞吐量方面，最小和解码器的性能
+  与用于$\mathbb{GF}(16)$的FFT-SPA解码器相似。但就像SPA解码器一样，当$\mathbb{GF}$阶数
+  大于$\mathbb{GF}(16)$时，性能会急剧下降。
+
+\subsection{与GPU相关工作的比较}
+
+  为了突出在x86处理器上实现NB-LDPC解码器的效率，我们将其吞吐量性能与GPU相关工作进行了比较。这并不容易：
+\begin{itemize}
+  \item 事实上，我们没能拿到整体定制的$H$矩阵，也就不能进行完全相同的设置\footnote{我们联系到了作者，但是除
+  \cite{noauthor_andrade_nodate,liu_high-throughput_2018}的两位开源了代码的作者外，没能获取$H$矩阵。}。
+  因此，我们使用了具有相似性质的NBLDPC码进行比较实验。
+  \item GPU的体系结构特征和编程模型与x86多核处理器有很大不同。因此，比较的目的是只提供全局的新兴趋势。
+  \item 各个实现选择的NB-LDPC解码调度不同。为了解决这个问题并实现与基于泛洪的调度解码器
+  （曲线使用$\bullet$标记）之间的比较，解码迭代次数减少了一半。事实上，分层调度解码
+  （曲线使用$\circ$标记）的收敛速度是基于泛洪的解码\cite{beermann_gpu_2015}速度的两倍。
+\end{itemize}
+
+  吞吐量比较见表5。粗体显示的值比最先进的值具有更高的性能水平。实验表明，x86体系结构更适合NB-LDPC码。
+  在单个桌面CPU内核上获得的吞吐量通常高于在GPU设备上获得的吞吐量。此外，当多个处理器内核被激活时，
+  吞吐量会随着内核数量的增加而增加。因此，该解码器在$P_1$平台上的吞吐量从0.63 Mbps提高到了42.75 Mbps。
+  对于包含更多物理处理器内核的$P_2$和$P_3$平台，性能更高，最高可达301 Mbps。对于所有配置，
+  同大多数GPU实现相比，$P_1$和$P_2$都有吞吐量优势。$P_3$平台上的性能优于所有GPU相关工作中报告的性能。
+
+% \begin{landscape}
+%   \centering
+%   \begin{table*}
+%     \caption{相关工作中GPU解码器的吞吐量比较。}
+%     \label{tab:5}
+    
+%     \begin{tabular}{llllllllllllllll}
+%       \toprule
+%       相关工作&&&&&&&&&&\multicolumn{2}{l}{$P_1$平台}&\multicolumn{2}{l}{$P_2$平台}&\multicolumn{2}{l}{$P_3$平台}\\
+%       \cmidrule(r){11-12}\cmidrule(r){13-14}\cmidrule(r){15-16}%cmidrule(r)可以形成隔断，而cline则不会
+%       引用&GPU&GPU&TDP&CUDA&主频&算法&码&$\mathbb{GF}$&$\Gamma$@its&P=1，$\Gamma$&P=4，$\Gamma$&P=1，$\Gamma$&P=24，$\Gamma$&P=1，$\Gamma$&P=28，$\Gamma$\\
+%       &平台&架构&（瓦）&cores&&&&&（Mbps）&（Mbps）&（Mbps）&（Mbps）&（Mbps）&（Mbps）&（Mbps）\\
+%       % 码&$\mathbb{GF}$&\multicolumn{2}{l}{$\Gamma$（Mbps）}&\multicolumn{2}{l}{$\Delta$（$\mu$s）}&\multicolumn{2}{l}{$\Gamma$（Mbps）}&\multicolumn{2}{l}{$\Delta$（$\mu$s）}\\
+%       \midrule
+%       \bottomrule
+%     \end{tabular}
+%   \end{table*}
+% \end{landscape}
 
 \section*{致谢}
 
