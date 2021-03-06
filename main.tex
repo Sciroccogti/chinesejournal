@@ -69,7 +69,7 @@
   这意味着以前的优化策略不能直接移植。因此，针对GPU目标，研究人员提出了另外的并行化策略。
   由于解码算法的主要差异，还必须在多核体系结构上重新设计它们。第一批研究\cite{noauthor_andrade_nodate,noauthor_beermann_nodate,andrade_optimized_2014,beermann_gpu_2015,liu_high-throughput_2018}
   集中于在GPU目标上实现具有高纠错性能的NB-LDPC解码算法，用于只关注纠错性能的应用。
-  使用5次分层解码迭代后，GPU上的吞吐率从1Mbps提高到了228Mbps。然而，处理延迟显著增加：
+  使用5次分层解码迭代后，GPU上的吞吐率从1 Mbps提高到了228 Mbps。然而，处理延迟显著增加：
   当选择最有效的吞吐量设置时，延迟在21 ms到123 ms不等\cite{liu_high-throughput_2018}。
   第二批研究\cite{noauthor_wang_nodate,noauthor_thi_nodate,noauthor_pham_nodate}
   集中于在GPU设备上实现解码启发式算法。然而，即便有较低的计算复杂度，与基于初始公式的解码吞吐量相比，
@@ -829,13 +829,13 @@
   $E_d=[TDP/(Thr.)]\times10^6$
 \end{table*}
   
-  最后，为了完成实验，表6提供了TNDC\footnote{Throughput under Normalized Decoding Cost（归一化解码开销下的吞吐量）\cite{noauthor_ying_nodate}}
+  最后，为了完成实验，表 \ref{tab:6} 提供了TNDC\footnote{Throughput under Normalized Decoding Cost（归一化解码开销下的吞吐量）\cite{noauthor_ying_nodate}}
   度量和每解码1比特的功耗度量。\cite{noauthor_ying_nodate}中定义的TNDC度量有助于比较实现效率，
   排除硬件平台对吞吐量的影响\cite{gal_high-throughput_2016,noauthor_cassagne_nodate,noauthor_ying_nodate,gal_high_2014,noauthor_peng_nodate}。
   为此，它从比较中舍弃了工作频率、处理器内核数和alu数。TNDC度量以每兆赫兹每核比特数的形式计算吞吐量。
   它并不能消除所有的体系结构差异，比如内存带宽和缓存层次结构，但它提供了有关实现的
-  处理效率的有价值的信息。在表6中，TNDC值表明，本文提出的x86实现在计算效率方面达到了
-  最好的结果。表6的第二部分给出了每解码1比特的能量。对于这一测量，基于GPU的解码器实现
+  处理效率的有价值的信息。在表 \ref{tab:6} 中，TNDC值表明，本文提出的x86实现在计算效率方面达到了
+  最好的结果。表 \ref{tab:6} 的第二部分给出了每解码1比特的能量。对于这一测量，基于GPU的解码器实现
   也需计入其主机CPU的功耗。结果表明，与GPU解码器实现方案相比，所提出的实现方案改善了
   比特功耗。事实上，$P_1$平台（$<35$W）的功耗远低于GPU设备。此外，尽管GPU的FLOPs/Watt
   比率很好，但是x86的每解码1比特的功耗在大多数情况下比GPU设备更为有利。对于$P_2$平台，
