@@ -12,7 +12,7 @@
 \usepackage{algorithmic}
 \usepackage{subfigure}
 \usepackage{stfloats}
-\usepackage{lscape}
+\usepackage[figuresright]{rotating}
 \begin{document}
 
 \title{基于x86多核处理器的高通量多元LDPC码FFT-SPA解码器的实现}
@@ -736,48 +736,147 @@
   （曲线使用$\circ$标记）的收敛速度是基于泛洪的解码\cite{beermann_gpu_2015}速度的两倍。
 \end{itemize}
 
-  吞吐量比较见表5。粗体显示的值比最先进的值具有更高的性能水平。实验表明，x86体系结构更适合NB-LDPC码。
+\begin{sidewaystable*}[htbp]
+  \caption{相关工作中GPU解码器的吞吐量比较。}
+  \label{tab:5}
+  \small
+  \setlength\tabcolsep{4pt}% 调整列间距
+  \begin{tabular}{llllllllllllllll}
+    \toprule
+    相关工作&&&&&&&&&&\multicolumn{2}{l}{$P_1$平台}&\multicolumn{2}{l}{$P_2$平台}&\multicolumn{2}{l}{$P_3$平台}\\
+    \cmidrule(r){11-12}\cmidrule(r){13-14}\cmidrule(r){15-16}%cmidrule(r)可以形成隔断，而cline则不会
+    引用&GPU&GPU&TDP&CUDA&主频&算法&码&$\mathbb{GF}$&$\Gamma$@its&P=1，$\Gamma$&P=4，$\Gamma$&P=1，$\Gamma$&P=24，$\Gamma$&P=1，$\Gamma$&P=28，$\Gamma$\\
+    &平台&架构&（瓦）&cores&&&&&（Mbps）&（Mbps）&（Mbps）&（Mbps）&（Mbps）&（Mbps）&（Mbps）\\
+    \midrule
+    Beermann et al. \cite{noauthor_beermann_nodate}&GTX 580&Fermi&244&512&1544&FFT&$576{\times}288^a$&$2^4$&0.15@100$\bullet$&\textbf{1.14}&\textbf{3.87}&\textbf{0.52}&\textbf{14.65}&\textbf{1.09}&\textbf{27.38}\\
+    &&&&&&&$384{\times}192^a$&$2^6$&0.09@100$\bullet$&\textbf{0.58}&\textbf{2.17}&\textbf{0.35}&\textbf{7.67}&\textbf{0.58}&\textbf{14.72}\\
+    &&&&&&&$288{\times}144^a$&$2^8$&0.03@100$\bullet$&\textbf{0.18}&\textbf{0.63}&\textbf{0.09}&\textbf{1.96}&\textbf{0.19}&\textbf{4.83}\\
+    Beermann et al. \cite{beermann_gpu_2015}&GTX 580&Fermi&244&512&1544&FFT&$576{\times}288^a$&$2^4$&0.32@10$\circ$&\textbf{5.60}&\textbf{18.87}&\textbf{2.60}&\textbf{70.39}&\textbf{5.40}&\textbf{136.35}\\
+    &&&&&&&$384{\times}192^a$&$2^6$&0.37@10$\circ$&\textbf{2.86}&\textbf{10.62}&\textbf{1.77}&\textbf{37.73}&\textbf{2.89}&\textbf{73.84}\\
+    &&&&&&&$288{\times}144^a$&$2^8$&0.25@10$\circ$&\textbf{0.89}&\textbf{3.09}&\textbf{0.46}&\textbf{9.96}&\textbf{0.93}&\textbf{23.68}\\
+    Wang et al. \cite{noauthor_wang_nodate}&GTX 470&Fermi&210&448&1215&Min-Max&$620{\times}310$&$2^5$&0.69@10$\bullet$&\textbf{6.09}&\textbf{22.04}&\textbf{3.45}&\textbf{75.38}&\textbf{5.66}&\textbf{142.38}\\
+    Thi et al. \cite{noauthor_thi_nodate}&GTX 650i&Kepler&110&768&928&Min-Max&$744{\times}651^a$&$2^5$&0.09@15$\bullet$&\textbf{3.78}&\textbf{13.74}&\textbf{2.15}&\textbf{46.81}&\textbf{3.71}&\textbf{92.61}\\
+    Pham et al. \cite{noauthor_pham_nodate}&GTX 650i&Kepler&110&768&928&Min-Max&$744{\times}653^a$&$2^5$&0.69@10$\bullet$&\textbf{5.91}&\textbf{21.62}&\textbf{3.41}&\textbf{73.82}&\textbf{5.77}&\textbf{145.58}\\
+    Pham et al. \cite{noauthor_pham_nodate}&GTX TITAN Black&Kepler&250&2880&980&Min-Max&$744{\times}653^a$&$2^5$&0.69@10$\bullet$&\textbf{5.91}&\textbf{21.62}&\textbf{3.41}&\textbf{73.82}&\textbf{5.77}&\textbf{145.58}\\
+    Andrade et al. \cite{noauthor_andrade_nodate}&C1060&Tesla&188&240&1296&FFT&$384{\times}256$&$2^5$&0.82@10$\bullet$&\textbf{8.70}&\textbf{30.25}&\textbf{5.22}&\textbf{112.81}&\textbf{7.83}&\textbf{191.04}\\
+    &&&&&&&$384{\times}256$&$2^6$&0.39@10$\bullet$&\textbf{5.51}&\textbf{20.65}&\textbf{3.56}&\textbf{74.66}&\textbf{5.95}&\textbf{147.28}\\
+    &&&&&&&$384{\times}256$&$2^7$&1.67@10$\bullet$&\textbf{3.49}&\textbf{12.05}&\textbf{2.02}&\textbf{41.63}&\textbf{3.43}&\textbf{87.78}\\
+    &&&&&&&$384{\times}256$&$2^8$&1.20@10$\bullet$&\textbf{1.80}&\textbf{6.25}&1.02&\textbf{22.55}&\textbf{1.84}&\textbf{46.24}\\
+    Liuetal.\cite{liu_high-throughput_2018}&GTX TITAN X&Maxwell&250&3072&1000&FFT&$64{\times}32$&$2^8$&17.6@5$\circ$&1.70&5.82&0.87&\textbf{18.06}&1.79&\textbf{46.97}\\
+    &&&&&&&$96{\times}16$&$2^7$&29.9@5$\circ$&3.11&10.82&1.69&\textbf{35.76}&3.17&\textbf{81.47}\\
+    &&&&&&&$186{\times}62$&$2^6$&73.7@5$\circ$&5.87&20.10&3.30&68.97&5.73&\textbf{143.79}\\
+    &&&&&&&$384{\times}256$&$2^5$&123@5$\circ$&8.69&29.64&5.28&111.84&7.74&\textbf{193.72}\\
+    &&&&&&&$384{\times}192$&$2^4$&219@5$\circ$&10.89&37.93&6.88&141.56&10.39&\textbf{263.36}\\
+    &&&&&&&$680{\times}170$&$2^4$&228@5$\circ$&12.16&42.75&7.44&155.67&11.47&\textbf{301.01}\\
+    \bottomrule
+  \end{tabular}
+  \medskip\newline
+  \noindent
+  $^\bullet$泛洪迭代-本文提出的x86解码器实现执行的解码迭代次数比其少2倍\\
+  $^\circ$分层迭代-本文提出的x86解码器实现执行相同数量的解码迭代\\
+  $^a$为了便于比较，由于作者的矩阵不可用，因此我们使用了等效的NB-LDPC码
+\end{sidewaystable*}
+
+  吞吐量比较见表 \ref{tab:5}。粗体显示的值比最先进的值具有更高的性能水平。实验表明，x86体系结构更适合NB-LDPC码。
   在单个桌面CPU内核上获得的吞吐量通常高于在GPU设备上获得的吞吐量。此外，当多个处理器内核被激活时，
   吞吐量会随着内核数量的增加而增加。因此，该解码器在$P_1$平台上的吞吐量从0.63 Mbps提高到了42.75 Mbps。
   对于包含更多物理处理器内核的$P_2$和$P_3$平台，性能更高，最高可达301 Mbps。对于所有配置，
   同大多数GPU实现相比，$P_1$和$P_2$都有吞吐量优势。$P_3$平台上的性能优于所有GPU相关工作中报告的性能。
 
-% \begin{landscape}
-%   \centering
-%   \begin{table*}
-%     \caption{相关工作中GPU解码器的吞吐量比较。}
-%     \label{tab:5}
-    
-%     \begin{tabular}{llllllllllllllll}
-%       \toprule
-%       相关工作&&&&&&&&&&\multicolumn{2}{l}{$P_1$平台}&\multicolumn{2}{l}{$P_2$平台}&\multicolumn{2}{l}{$P_3$平台}\\
-%       \cmidrule(r){11-12}\cmidrule(r){13-14}\cmidrule(r){15-16}%cmidrule(r)可以形成隔断，而cline则不会
-%       引用&GPU&GPU&TDP&CUDA&主频&算法&码&$\mathbb{GF}$&$\Gamma$@its&P=1，$\Gamma$&P=4，$\Gamma$&P=1，$\Gamma$&P=24，$\Gamma$&P=1，$\Gamma$&P=28，$\Gamma$\\
-%       &平台&架构&（瓦）&cores&&&&&（Mbps）&（Mbps）&（Mbps）&（Mbps）&（Mbps）&（Mbps）&（Mbps）\\
-%       % 码&$\mathbb{GF}$&\multicolumn{2}{l}{$\Gamma$（Mbps）}&\multicolumn{2}{l}{$\Delta$（$\mu$s）}&\multicolumn{2}{l}{$\Gamma$（Mbps）}&\multicolumn{2}{l}{$\Delta$（$\mu$s）}\\
-%       \midrule
-%       \bottomrule
-%     \end{tabular}
-%   \end{table*}
-% \end{landscape}
+  在4G LTE标准中，接收机端可用于执行完整基带处理的延迟预算约为4毫秒。在通信延迟
+  成为主要限制的未来数字通信标准中，该预算将低于1毫秒。建议的x86 NB-LDPC解码器实现
+  极大地提高了性能与GPU实现比较的处理延迟参数。对于最有效的GPU实现\cite{liu_high-throughput_2018}，
+  报告的处理延迟是六个基准NB-LDPC码：21 ms、19 ms、39 ms、108 ms、96 ms和123 ms。
+  对于同样的NB-LDPC码，本文提出的x86解码器实现能有平均272倍（最小66倍，最大542倍）的延迟的减少。
+  $P_3$的处理延迟分别为319$\mu$s、235$\mu$s、225$\mu$s、330$\mu$s、177$\mu$s和279$\mu$s。
+  基于GPU的实现（例如\cite{liu_high-throughput_2018}）是利用其较大的计算并行度和
+  多码字解码而提供高吞吐量性能。这并不适合数字通信标准。
+
+\begin{table*}[htbp]
+  \caption{相关工作中$K=6144$和6次解码迭代的吞吐量和延迟比较。}
+  \label{tab:6}
+  \setlength\tabcolsep{4pt}% 调整列间距
+  \begin{tabular}{llllllllllll}
+    \toprule
+    引用&GPU&码&$\mathbb{GF}$&TNDC&\multicolumn{7}{c}{$E_d$}\\
+    &平台&&&GPU&$P_1$&$P_2$&$P_3$&GPU&$P_1$&$P_2$&$P_3$\\
+    \midrule
+    Beermann et al. \cite{noauthor_beermann_nodate}&GTX 550Ti&$576{\times}288$&$2^4$&0.2&\textbf{24}&\textbf{31}&\textbf{32}&1626&\textbf{12.1}&\textbf{13.7}&\textbf{7.3}\\
+    &&$384{\times}192$&$2^6$&0.1&\textbf{12}&\textbf{16}&\textbf{17}&2711&\textbf{24.0}&\textbf{26.1}&\textbf{13.6}\\
+    &&$288{\times}144$&$2^8$&0.04&\textbf{4}&\textbf{4}&\textbf{6}&8133&\textbf{79.5}&\textbf{102.0}&\textbf{41.4}\\
+    Beermann et al. \cite{beermann_gpu_2015}&GTX 580&$576{\times}288^a$&$2^4$&0.4&\textbf{121}&\textbf{147}&\textbf{160}&762&\textbf{2.4}&\textbf{2.8}&\textbf{1.5}\\
+    &&$384{\times}192^a$&$2^6$&0.5&\textbf{61}&\textbf{79}&\textbf{87}&659&\textbf{4.9}&\textbf{5.3}&\textbf{2.7}\\
+    &&$288{\times}144^a$&$2^8$&0.3&\textbf{18}&\textbf{21}&\textbf{28}&976&\textbf{16.4}&\textbf{20.1}&\textbf{8.4}\\
+    Wang et al. \cite{noauthor_wang_nodate}&GTX 470&$620{\times}310$&$2^5$&1.3&\textbf{126}&\textbf{157}&\textbf{167}&304&\textbf{2.3}&\textbf{2.7}&\textbf{1.4}\\
+    Thi et al. \cite{noauthor_thi_nodate}&GTX 650i&$744{\times}651^a$&$2^5$&1.0&\textbf{77}&\textbf{98}&\textbf{109}&159&\textbf{3.8}&\textbf{4.3}&\textbf{2.2}\\
+    Pham et al. \cite{noauthor_pham_nodate}&GTX 650i&$744{\times}653^a$&$2^5$&1.0&\textbf{124}&\textbf{154}&\textbf{171}&159&\textbf{2.4}&\textbf{2.7}&\textbf{1.4}\\
+    Pham et al. \cite{noauthor_pham_nodate}&GTX TITAN Black&$744{\times}653^a$&$2^5$&0.2&\textbf{124}&\textbf{153}&\textbf{170}&362&\textbf{2.4}&\textbf{2.7}&\textbf{1.4}\\
+    Andrade et al. \cite{noauthor_andrade_nodate}&C1060&$384{\times}256$&$2^5$&2.6&\textbf{181}&\textbf{235}&\textbf{224}&229&\textbf{1.6}&\textbf{1.8}&\textbf{1.0}\\
+    &&$384{\times}256$&$2^6$&1.3&\textbf{120}&\textbf{156}&\textbf{173}&482&\textbf{2.5}&\textbf{2.7}&\textbf{1.4}\\
+    &&$384{\times}256$&$2^7$&5.4&\textbf{67}&\textbf{87}&\textbf{103}&112&\textbf{4.4}&\textbf{4.8}&\textbf{2.3}\\
+    &&$384{\times}256$&$2^8$&3.9&\textbf{36}&\textbf{47}&\textbf{54}&156&\textbf{8.1}&\textbf{8.9}&\textbf{4.3}\\
+    Liuetal.\cite{liu_high-throughput_2018}&GTX TITAN X&$64{\times}32$&$2^8$&5.7&\textbf{35}&\textbf{38}&\textbf{55}&14.2&\textbf{8.4}&\textbf{11.1}&\textbf{4.3}\\
+    &&$96{\times}16$&$2^7$&9.7&\textbf{60}&\textbf{75}&\textbf{96}&8.4&\textbf{4.9}&\textbf{5.6}&\textbf{2.5}\\
+    &&$186{\times}62$&$2^6$&24&\textbf{123}&\textbf{144}&\textbf{169}&3.4&\textbf{2.4}&\textbf{2.9}&\textbf{1.4}\\
+    &&$384{\times}256$&$2^5$&40&\textbf{174}&\textbf{233}&\textbf{228}&2.0&\textbf{1.7}&\textbf{1.8}&\textbf{1.0}\\
+    &&$384{\times}192$&$2^4$&71&\textbf{239}&\textbf{295}&\textbf{309}&1.1&1.2&1.4&\textbf{0.8}\\
+    &&$680{\times}170$&$2^4$&74&\textbf{258}&\textbf{324}&\textbf{354}&1.1&1.1&1.3&\textbf{0.7}\\
+    \bottomrule
+  \end{tabular}
+  \medskip\newline
+  \noindent
+  $TNDC=(Thr.)/(Cores\times{Freq.}\times{SIMD})\times{10^6}$\\
+  $E_d=[TDP/(Thr.)]\times10^6$
+\end{table*}
+  
+  最后，为了完成实验，表6提供了TNDC\footnote{Throughput under Normalized Decoding Cost（归一化解码开销下的吞吐量）\cite{noauthor_ying_nodate}}
+  度量和每解码1比特的功耗度量。\cite{noauthor_ying_nodate}中定义的TNDC度量有助于比较实现效率，
+  排除硬件平台对吞吐量的影响\cite{gal_high-throughput_2016,noauthor_cassagne_nodate,noauthor_ying_nodate,gal_high_2014,noauthor_peng_nodate}。
+  为此，它从比较中舍弃了工作频率、处理器内核数和alu数。TNDC度量以每兆赫兹每核比特数的形式计算吞吐量。
+  它并不能消除所有的体系结构差异，比如内存带宽和缓存层次结构，但它提供了有关实现的
+  处理效率的有价值的信息。在表6中，TNDC值表明，本文提出的x86实现在计算效率方面达到了
+  最好的结果。表6的第二部分给出了每解码1比特的能量。对于这一测量，基于GPU的解码器实现
+  也需计入其主机CPU的功耗。结果表明，与GPU解码器实现方案相比，所提出的实现方案改善了
+  比特功耗。事实上，$P_1$平台（$<35$W）的功耗远低于GPU设备。此外，尽管GPU的FLOPs/Watt
+  比率很好，但是x86的每解码1比特的功耗在大多数情况下比GPU设备更为有利。对于$P_2$平台，
+  功耗更接近GPU设备，但是由于其更高的吞吐量性能，功耗/吞吐量比也比大多数GPU相关的工作更有优势。
+  $P_3$平台始终可以实现最佳能效。与\cite{liu_high-throughput_2018}中详述的GPU实现相比，
+  可以节省1.5倍到3倍的能源。
+
+  综上所述，高端多核CPU是未来SDR或基于云的RAN系统中实时实现NB-LDPC信道编码功能的有效竞争对手。
+  它们比GPU更节能，同时还提供相似或更高的吞吐量和更低的处理延迟。总的来说，
+  这种高端多核CPU目前看来是GPU架构的可行替代品。
+
+\subsection{与二进制LDPC解码器的比较与展望}
+
+  与相关工作相比，在x86处理器上实现的NB-LDPC解码器在吞吐量和每解码比特能量方面提供了有趣的特性。
+  然而，与在x86或GPU平台上达到数百Mbps或Gbps的二进制LDPC解码器相比，仍然存在差距。
+  不过，NB-LDPC码提供的纠错性能是二进制LDPC解码器在同等帧长下无法达到的。
+  为了减少二进制和非二进制LDPC解码器实现之间的吞吐量差距，应该考虑算法优化，
+  例如最小-最大或最小和的算法选择和整数变量的使用。
+
+\section{结论}
+  本文提出了一种基于多核结构的软件NB-LDPC解码方法。与相关工作不同的是，这是针对x86架构的。
+  在FFT-SPA解码算法的实现中，我们充分利用了x86多核特性。一个比GPU更灵活的编程模型
+  帮助我们所提出的解码器实现达到了比GPU设备更高的吞吐量，即使用的是笔记本电脑的Core i7
+  处理器。在Xeon平台上的实验结果表明，该解码器具有较高的吞吐量和可扩展性。这些提供高吞吐量、
+  低延迟和低功耗的NB-LDPC解码器可能是未来SDR系统的合适候选。最后，未来的处理器体系结构
+  功能（例如，英特尔处理器的AVX-512）应该可以比当前的性能水平高2到3倍。
 
 \section*{致谢}
 
-致谢内容。
+  本文作者感谢 INTEL 公司提供的 vLab 学术研究环境的使用权。
 
-
-\nocite{*}
+% \nocite{*}
 
 \bibliographystyle{cjc}
 \bibliography{refs}
 
+% \appendix
 
+% \section{}
 
-\appendix
-
-\section{}
-
-附录内容置于此处，字体为小5号宋体。附录内容包括：详细的定理证明、公式推导、原始数据等
+% 附录内容置于此处，字体为小5号宋体。附录内容包括：详细的定理证明、公式推导、原始数据等
 
 
 
